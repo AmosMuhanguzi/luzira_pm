@@ -35,7 +35,7 @@ def seed():
 
         # ---- Default admin ----
 
-         if not UserAccount.query.filter_by(username='admin').first():
+        if not UserAccount.query.filter_by(username='admin').first():
             admin = UserAccount(
                 username='admin',
                 email='admin@luzira.local',
