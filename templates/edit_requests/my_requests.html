@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}My Edit Requests — Luzira PMS{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h3 class="mb-0"><i class="bi bi-send-check"></i> My Edit Requests</h3>
+    <a href="{{ url_for('auth.dashboard') }}" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-arrow-left"></i> Dashboard
+    </a>
+</div>
+
+<div class="card shadow-sm border-0">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="table-dark">
+                <tr>
+                    <th>#</th>
+                    <th>Target</th>
+                    <th>Submitted</th>
+                    <th>Fields</th>
+                    <th>Status</th>
+                    <th>Reviewer notes</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for r in requests %}
+                <tr>
+                    <td><code>#{{ r.request_id }}</code></td>
+                    <td>
+                        {{ r.target_label or (r.target_type ~ ' #' ~ r.target_id) }}
+                        {% if r.target_type == 'Inmate' %}
+                        <a href="{{ url_for('inmate.detail', inmate_id=r.target_id) }}"
+                           class="small">(view)</a>
+                        {% endif %}
+                    </td>
+                    <td class="small text-muted">{{ r.requested_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                    <td><span class="badge bg-info text-dark">{{ r.change_count }}</span></td>
+                    <td>
+                        <span class="badge
+                            {% if r.status == 'Pending' %}bg-warning text-dark
+                            {% elif r.status == 'Approved' %}bg-success
+                            {% else %}bg-danger{% endif %}">
+                            {{ r.status }}
+                        </span>
+                    </td>
+                    <td class="small text-muted">
+                        {% if r.status == 'Rejected' and r.review_notes %}
+                            {{ r.review_notes }}
+                        {% elif r.status == 'Approved' %}
+                            Approved by {{ r.reviewer.full_name if r.reviewer else '—' }}
+                        {% else %}
+                            —
+                        {% endif %}
+                    </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="6" class="text-center text-muted py-4">
+                    You haven't submitted any edit requests yet.
+                </td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

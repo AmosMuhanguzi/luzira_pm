@@ -1,0 +1,85 @@
+{% extends "visitor/_layout.html" %}
+{% block title %}Check-in — {{ visitor.full_name }}{% endblock %}
+
+{% block visitor_content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h3 class="mb-0"><i class="bi bi-box-arrow-in-right"></i> Check-in Visitor</h3>
+    <a href="{{ url_for('visitor.detail', visitor_id=visitor.visitor_id) }}"
+       class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-arrow-left"></i> Back to visitor
+    </a>
+</div>
+
+<div class="alert alert-info">
+    <strong>{{ visitor.full_name }}</strong> ({{ visitor.visitor_number }})
+    · Phone {{ visitor.phone_number }}
+    · Visits so far: {{ visitor.total_visits }}
+    {% if visitor.anomaly_flag %}
+        <span class="badge bg-warning text-dark ms-2">
+            <i class="bi bi-robot"></i> AI flagged
+        </span>
+    {% endif %}
+</div>
+
+<form method="POST" novalidate>
+    <div class="card shadow-sm border-0 mb-3">
+        <div class="card-header bg-dark text-white">
+            <i class="bi bi-person-vcard"></i> Which inmate is being visited?
+        </div>
+        <div class="card-body">
+            {% if inmates %}
+            <div class="mb-3">
+                <label class="form-label">Select inmate *</label>
+                <select name="inmate_id" class="form-select" required>
+                    <option value="">-- choose --</option>
+                    {% for i in inmates %}
+                    <option value="{{ i.inmate_id }}">
+                        {{ i.inmate_number }} — {{ i.full_name }}
+                        ({{ i.cell_block or 'no cell' }})
+                    </option>
+                    {% endfor %}
+                </select>
+                <div class="form-text">
+                    Only active inmates are shown.
+                </div>
+            </div>
+            {% else %}
+            <div class="alert alert-warning mb-0">
+                No active inmates in the facility. Register an inmate first.
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="card shadow-sm border-0 mb-3">
+        <div class="card-header bg-dark text-white">
+            <i class="bi bi-clipboard-check"></i> Visit details
+        </div>
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <label class="form-label">Visit type</label>
+                    <select name="visit_type" class="form-select">
+                        {% for t in ['Regular','Legal','Emergency','Official'] %}
+                        <option value="{{ t }}">{{ t }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-8">
+                    <label class="form-label">Items brought (if any)</label>
+                    <input type="text" name="items_brought" class="form-control"
+                           placeholder="e.g. food package, clothes">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="d-flex justify-content-end gap-2 mb-4">
+        <a href="{{ url_for('visitor.detail', visitor_id=visitor.visitor_id) }}"
+           class="btn btn-outline-secondary">Cancel</a>
+        <button type="submit" class="btn btn-success btn-lg" {{ 'disabled' if not inmates }}>
+            <i class="bi bi-check2-circle"></i> Confirm Check-in
+        </button>
+    </div>
+</form>
+{% endblock %}

@@ -1,0 +1,194 @@
+{% extends "base.html" %}
+{% block title %}AI Analytics — Luzira PMS{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2 class="mb-1"><i class="bi bi-robot"></i> AI Analytics</h2>
+        <p class="text-muted mb-0">Anomaly detection · Population forecasting · Risk profiling</p>
+    </div>
+    <div class="d-flex gap-2">
+        <form method="POST" action="{{ url_for('ai.train_model') }}" class="d-inline">
+            <button class="btn btn-outline-primary btn-sm">
+                <i class="bi bi-cpu"></i> Train Model
+            </button>
+        </form>
+        <form method="POST" action="{{ url_for('ai.run_visitor_analysis') }}" class="d-inline">
+            <button class="btn btn-outline-success btn-sm">
+                <i class="bi bi-play"></i> Run Visitor Analysis
+            </button>
+        </form>
+        <form method="POST" action="{{ url_for('ai.run_population_forecast') }}" class="d-inline">
+            <button class="btn btn-outline-info btn-sm">
+                <i class="bi bi-graph-up"></i> Forecast
+            </button>
+        </form>
+        <a href="{{ url_for('ai.weekly_report') }}" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-printer"></i> Weekly Report
+        </a>
+    </div>
+</div>
+
+<!-- Stats row -->
+<div class="row g-3 mb-4">
+    <div class="col-md-3">
+        <div class="card bg-primary text-white h-100">
+            <div class="card-body">
+                <h6 class="text-uppercase small opacity-75">Total Visitors</h6>
+                <h2>{{ total_visitors }}</h2>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-warning text-dark h-100">
+            <div class="card-body">
+                <h6 class="text-uppercase small opacity-75">Flagged Visitors</h6>
+                <h2>{{ flagged_visitors }}</h2>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-danger text-white h-100">
+            <div class="card-body">
+                <h6 class="text-uppercase small opacity-75">High-risk Inmates</h6>
+                <h2>{{ high_risk_inmates }}</h2>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-info text-white h-100">
+            <div class="card-body">
+                <h6 class="text-uppercase small opacity-75">Current Population</h6>
+                <h2>{{ latest_forecast.current_capacity if latest_forecast else '—' }}</h2>
+                <small class="opacity-75">
+                    {% if latest_forecast %}
+                    Forecast: {{ latest_forecast.predicted_population }} ({{ latest_forecast.capacity_utilization }}%)
+                    {% endif %}
+                </small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Risk distribution + forecast -->
+<div class="row g-3 mb-4">
+    <div class="col-md-6">
+        <div class="card shadow-sm border-0 h-100">
+            <div class="card-header bg-dark text-white">
+                <i class="bi bi-pie-chart"></i> Inmate Risk Distribution
+            </div>
+            <div class="card-body">
+                {% set total = risk_counts.values()|sum %}
+                {% for level, count in risk_counts.items() %}
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between mb-1">
+                        <span>{{ level }}</span>
+                        <span class="text-muted small">
+                            {{ count }} / {{ total }}
+                        </span>
+                    </div>
+                    <div class="progress" style="height: 20px;">
+                        {% set pct = (count / total * 100) if total else 0 %}
+                        <div class="progress-bar
+                            {% if level == 'Critical' %}bg-danger
+                            {% elif level == 'High' %}bg-warning
+                            {% elif level == 'Medium' %}bg-info
+                            {% else %}bg-success{% endif %}"
+                             style="width: {{ pct }}%">{{ '%.0f'|format(pct) }}%</div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6">
+        <div class="card shadow-sm border-0 h-100">
+            <div class="card-header bg-dark text-white">
+                <i class="bi bi-graph-up"></i> Population Forecast
+            </div>
+            <div class="card-body">
+                {% if latest_forecast %}
+                <dl class="row mb-0">
+                    <dt class="col-7">Generated</dt>
+                    <dd class="col-5">{{ latest_forecast.generated_at.strftime('%Y-%m-%d %H:%M') }}</dd>
+                    <dt class="col-7">Forecast date</dt>
+                    <dd class="col-5">{{ latest_forecast.forecast_date }}</dd>
+                    <dt class="col-7">Predicted population</dt>
+                    <dd class="col-5"><strong>{{ latest_forecast.predicted_population }}</strong></dd>
+                    <dt class="col-7">Capacity</dt>
+                    <dd class="col-5">{{ latest_forecast.current_capacity }}</dd>
+                    <dt class="col-7">Utilization</dt>
+                    <dd class="col-5">{{ latest_forecast.capacity_utilization }}%</dd>
+                    <dt class="col-7">Overcrowding risk</dt>
+                    <dd class="col-5">
+                        {% set rnum = latest_forecast.predicted_overcrowding_risk|float %}
+                        <span class="badge
+                            {% if rnum >= 0.9 %}bg-danger
+                            {% elif rnum >= 0.8 %}bg-warning text-dark
+                            {% elif rnum >= 0.5 %}bg-info
+                            {% else %}bg-success{% endif %}">
+                            {% if rnum >= 0.9 %}Critical
+                            {% elif rnum >= 0.8 %}High
+                            {% elif rnum >= 0.5 %}Medium
+                            {% else %}Low{% endif %}
+                        </span>
+                    </dd>
+                </dl>
+                {% else %}
+                <p class="text-muted mb-0">No forecast yet. Click <strong>Forecast</strong> above.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Latest alerts -->
+<div class="card shadow-sm border-0">
+    <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-bell"></i> Latest AI Alerts</span>
+        <a href="{{ url_for('ai.alerts') }}" class="btn btn-sm btn-outline-light">View all</a>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-hover mb-0">
+            <thead>
+                <tr>
+                    <th>When</th>
+                    <th>Type</th>
+                    <th>Target</th>
+                    <th>Severity</th>
+                    <th>Summary</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for a in alerts %}
+                <tr>
+                    <td class="small text-muted">{{ a.analysis_timestamp.strftime('%Y-%m-%d %H:%M') }}</td>
+                    <td>{{ a.analysis_type }}</td>
+                    <td>{{ a.target_entity }}{% if a.target_id %} #{{ a.target_id }}{% endif %}</td>
+                    <td>
+                        <span class="badge
+                            {% if a.severity == 'Critical' %}bg-danger
+                            {% elif a.severity == 'High' %}bg-warning text-dark
+                            {% elif a.severity == 'Medium' %}bg-info
+                            {% else %}bg-secondary{% endif %}">
+                            {{ a.severity }}
+                        </span>
+                    </td>
+                    <td class="small">{{ a.result_summary[:100] }}{% if a.result_summary|length > 100 %}…{% endif %}</td>
+                    <td class="text-end">
+                        <a href="{{ url_for('ai.alert_detail', alert_id=a.analysis_id) }}"
+                           class="btn btn-sm btn-outline-primary">Review</a>
+                    </td>
+                </tr>
+            {% else %}
+                <tr><td colspan="6" class="text-muted text-center py-4">
+                    No alerts. Run the analyses above to generate insights.
+                </td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

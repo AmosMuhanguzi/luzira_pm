@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% block title %}Alert #{{ alert.analysis_id }} — Luzira PMS{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2 class="mb-0"><i class="bi bi-exclamation-triangle"></i> Alert #{{ alert.analysis_id }}</h2>
+    <a href="{{ url_for('ai.alerts') }}" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-arrow-left"></i> Back
+    </a>
+</div>
+
+<div class="row g-3">
+    <div class="col-md-8">
+        <div class="card shadow-sm border-0 mb-3">
+            <div class="card-header bg-dark text-white">Alert</div>
+            <div class="card-body">
+                <dl class="row mb-0">
+                    <dt class="col-sm-3">Type</dt><dd class="col-sm-9">{{ alert.analysis_type }}</dd>
+                    <dt class="col-sm-3">When</dt><dd class="col-sm-9">{{ alert.analysis_timestamp.strftime('%Y-%m-%d %H:%M') }}</dd>
+                    <dt class="col-sm-3">Target</dt>
+                    <dd class="col-sm-9">
+                        {{ alert.target_entity }}{% if alert.target_id %} #{{ alert.target_id }}{% endif %}
+                        {% if target and alert.target_entity == 'Visitor' %}
+                            · <a href="{{ url_for('visitor.detail', visitor_id=target.visitor_id) }}">View visitor</a>
+                        {% elif target and alert.target_entity == 'Inmate' %}
+                            · <a href="{{ url_for('inmate.detail', inmate_id=target.inmate_id) }}">View inmate</a>
+                        {% endif %}
+                    </dd>
+                    <dt class="col-sm-3">Severity</dt>
+                    <dd class="col-sm-9">
+                        <span class="badge
+                            {% if alert.severity == 'Critical' %}bg-danger
+                            {% elif alert.severity == 'High' %}bg-warning text-dark
+                            {% elif alert.severity == 'Medium' %}bg-info
+                            {% else %}bg-secondary{% endif %}">
+                            {{ alert.severity }}
+                        </span>
+                    </dd>
+                    <dt class="col-sm-3">Summary</dt>
+                    <dd class="col-sm-9">{{ alert.result_summary }}</dd>
+                    {% if alert.recommended_action %}
+                    <dt class="col-sm-3">Recommended</dt>
+                    <dd class="col-sm-9">{{ alert.recommended_action }}</dd>
+                    {% endif %}
+                </dl>
+            </div>
+        </div>
+
+        {% if alert.detailed_result %}
+        <div class="card shadow-sm border-0 mb-3">
+            <div class="card-header bg-dark text-white">Details (JSON)</div>
+            <div class="card-body">
+                <pre class="small mb-0" style="white-space: pre-wrap;">{{ alert.detailed_result }}</pre>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="col-md-4">
+        {% if has_permission('ai:review_alerts') %}
+        <div class="card shadow-sm border-0">
+            <div class="card-header bg-dark text-white">Review</div>
+            <div class="card-body">
+                {% if alert.is_reviewed %}
+                    <div class="alert alert-success small mb-0">
+                        Reviewed on {{ alert.reviewed_at.strftime('%Y-%m-%d %H:%M') }}
+                        {% if alert.review_notes %}<br>{{ alert.review_notes }}{% endif %}
+                    </div>
+                {% else %}
+                <form method="POST" action="{{ url_for('ai.review_alert', alert_id=alert.analysis_id) }}">
+                    <div class="mb-3">
+                        <label class="form-label small">Action taken</label>
+                        <input type="text" name="action" class="form-control form-control-sm"
+                               placeholder="e.g. Denied entry, interviewed">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small">Notes</label>
+                        <textarea name="notes" class="form-control form-control-sm" rows="3"></textarea>
+                    </div>
+                    <button class="btn btn-success btn-sm w-100">
+                        <i class="bi bi-check2"></i> Mark as reviewed
+                    </button>
+                </form>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

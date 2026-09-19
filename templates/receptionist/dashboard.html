@@ -1,0 +1,456 @@
+<!-- templates/receptionist/dashboard.html -->
+{% extends "base.html" %}
+
+{% block title %}Receptionist Dashboard - Luzira PMS{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h2><i class="fas fa-user-tie"></i> Receptionist Dashboard</h2>
+                    <p class="text-muted">Welcome, {{ current_user.full_name }}</p>
+                </div>
+                <div>
+                    <span class="badge bg-success">Biometric Scanner: <span id="scannerStatus">Ready</span></span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card bg-primary text-white h-100">
+                <div class="card-body text-center">
+                    <i class="fas fa-user-plus fa-3x mb-3"></i>
+                    <h4>New Prisoner Intake</h4>
+                    <p>Register new inmate with biometric enrollment</p>
+                    <a href="{{ url_for('inmate.new_intake') }}" class="btn btn-light btn-lg">
+                        Start Intake
+                    </a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-success text-white h-100">
+                <div class="card-body text-center">
+                    <i class="fas fa-fingerprint fa-3x mb-3"></i>
+                    <h4>Returning Inmate</h4>
+                    <p>Identify and process re-admission</p>
+                    <a href="{{ url_for('inmate.returning_intake') }}" class="btn btn-light btn-lg">
+                        Scan Fingerprint
+                    </a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-info text-white h-100">
+                <div class="card-body text-center">
+                    <i class="fas fa-users fa-3x mb-3"></i>
+                    <h4>Visitor Check-in</h4>
+                    <p>Process visitor registration and verification</p>
+                    <a href="{{ url_for('visitor.check_in') }}" class="btn btn-light btn-lg">
+                        Check-in Visitor
+                    </a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-warning text-dark h-100">
+                <div class="card-body text-center">
+                    <i class="fas fa-search fa-3x mb-3"></i>
+                    <h4>Search Records</h4>
+                    <p>Find inmate or visitor records</p>
+                    <a href="{{ url_for('search.index') }}" class="btn btn-dark btn-lg">
+                        Search
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Statistics Cards -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h6 class="text-muted">Today's Admissions</h6>
+                            <h2>{{ stats.today_admissions }}</h2>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-sign-in-alt fa-2x text-primary"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h6 class="text-muted">Today's Releases</h6>
+                            <h2>{{ stats.today_releases }}</h2>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-sign-out-alt fa-2x text-success"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h6 class="text-muted">Today's Visitors</h6>
+                            <h2>{{ stats.today_visitors }}</h2>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-users fa-2x text-info"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h6 class="text-muted">Pending Actions</h6>
+                            <h2>{{ stats.pending_actions }}</h2>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-clock fa-2x text-warning"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Biometric Scanner Panel -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header bg-dark text-white">
+                    <i class="fas fa-fingerprint"></i> Biometric Scanner Status
+                </div>
+                <div class="card-body">
+                    <div id="scannerPanel">
+                        <div class="text-center py-4">
+                            <div id="scannerIcon" class="mb-3">
+                                <i class="fas fa-fingerprint fa-5x text-success"></i>
+                            </div>
+                            <h4 id="scannerMessage">Scanner Ready</h4>
+                            <p class="text-muted" id="scannerDetail">Place finger on scanner to begin</p>
+                        </div>
+                        <div class="progress mb-3" style="height: 20px;">
+                            <div id="scanProgress" class="progress-bar" style="width: 0%"></div>
+                        </div>
+                        <div class="d-grid gap-2">
+                            <button id="startScanBtn" class="btn btn-primary btn-lg" onclick="startFingerprintScan()">
+                                <i class="fas fa-play"></i> Start Scan
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Recent Activity -->
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header bg-secondary text-white">
+                    <i class="fas fa-history"></i> Recent Activity
+                </div>
+                <div class="card-body" style="max-height: 300px; overflow-y: auto;">
+                    <div class="list-group list-group-flush">
+                        {% for activity in recent_activities %}
+                        <div class="list-group-item">
+                            <div class="d-flex w-100 justify-content-between">
+                                <small class="text-muted">{{ activity.timestamp.strftime('%H:%M') }}</small>
+                                <span class="badge bg-{{ activity.badge_color }}">{{ activity.type }}</span>
+                            </div>
+                            <p class="mb-1">{{ activity.description }}</p>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Biometric Scan Modal -->
+<div class="modal fade" id="biometricModal" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title"><i class="fas fa-fingerprint"></i> Biometric Identification</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body text-center">
+                <div id="scanAnimation">
+                    <i class="fas fa-fingerprint fa-6x text-primary pulse-animation"></i>
+                </div>
+                <h3 id="scanStatus" class="mt-3">Waiting for fingerprint...</h3>
+                <p id="scanInstructions" class="text-muted">Please place the individual's finger on the scanner</p>
+                
+                <div class="progress mt-4" style="height: 25px;">
+                    <div id="scanProgressBar" class="progress-bar progress-bar-striped progress-bar-animated" 
+                         style="width: 0%">0%</div>
+                </div>
+                
+                <div id="matchResult" class="mt-4" style="display: none;">
+                    <!-- Match result will be displayed here -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" onclick="cancelScan()">Stop Scan</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let scanInProgress = false;
+let scanAbortController = null;
+
+async function startFingerprintScan() {
+    if (scanInProgress) return;
+    
+    scanInProgress = true;
+    scanAbortController = new AbortController();
+    
+    // Show modal
+    const modal = new bootstrap.Modal(document.getElementById('biometricModal'));
+    modal.show();
+    
+    // Update UI
+    updateScanUI('scanning', 'Scanning fingerprint...', 'Hold finger steady on scanner');
+    
+    try {
+        // Call local biometric agent
+        const response = await fetch('http://127.0.0.1:5001/api/scan', {
+            method: 'POST',
+            signal: scanAbortController.signal
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            // Process the captured template
+            await processFingerprint(result.template, result.quality);
+        } else {
+            updateScanUI('error', 'Scan Failed', result.error);
+        }
+        
+    } catch (error) {
+        if (error.name === 'AbortError') {
+            console.log('Scan cancelled');
+        } else {
+            updateScanUI('error', 'Connection Error', 'Could not connect to biometric scanner');
+        }
+    } finally {
+        scanInProgress = false;
+    }
+}
+
+async function processFingerprint(template, quality) {
+    updateScanUI('processing', 'Processing...', 'Searching database for match');
+    
+    // Update progress
+    let progress = 0;
+    const progressInterval = setInterval(() => {
+        progress += 10;
+        document.getElementById('scanProgressBar').style.width = progress + '%';
+        document.getElementById('scanProgressBar').textContent = progress + '%';
+    }, 200);
+    
+    try {
+        // Send to backend for 1:N matching
+        const response = await fetch('/api/biometric/identify', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCSRFToken()
+            },
+            body: JSON.stringify({
+                template: template,
+                quality: quality,
+                type: 'inmate'  // or 'visitor'
+            })
+        });
+        
+        clearInterval(progressInterval);
+        const result = await response.json();
+        
+        if (result.match) {
+            // Match found - returning inmate
+            updateScanUI('match', 'MATCH FOUND', 
+                `Confidence: ${result.score.toFixed(1)}%`);
+            displayMatchResult(result.inmate, result.score);
+        } else {
+            // No match - new inmate
+            updateScanUI('no-match', 'NO MATCH FOUND', 
+                `Best score: ${result.score.toFixed(1)}% (below threshold)`);
+            displayNoMatchResult(template, quality);
+        }
+        
+    } catch (error) {
+        clearInterval(progressInterval);
+        updateScanUI('error', 'Processing Error', error.message);
+    }
+}
+
+function updateScanUI(status, title, message) {
+    const icon = document.getElementById('scanAnimation');
+    const statusEl = document.getElementById('scanStatus');
+    const instructionsEl = document.getElementById('scanInstructions');
+    
+    statusEl.textContent = title;
+    instructionsEl.textContent = message;
+    
+    switch(status) {
+        case 'scanning':
+            icon.innerHTML = '<i class="fas fa-fingerprint fa-6x text-primary pulse-animation"></i>';
+            break;
+        case 'processing':
+            icon.innerHTML = '<i class="fas fa-spinner fa-6x text-warning fa-spin"></i>';
+            break;
+        case 'match':
+            icon.innerHTML = '<i class="fas fa-check-circle fa-6x text-success"></i>';
+            break;
+        case 'no-match':
+            icon.innerHTML = '<i class="fas fa-times-circle fa-6x text-danger"></i>';
+            break;
+        case 'error':
+            icon.innerHTML = '<i class="fas fa-exclamation-triangle fa-6x text-danger"></i>';
+            break;
+    }
+}
+
+function displayMatchResult(inmate, score) {
+    const resultDiv = document.getElementById('matchResult');
+    resultDiv.style.display = 'block';
+    resultDiv.innerHTML = `
+        <div class="alert alert-success">
+            <h4><i class="fas fa-user-check"></i> Returning Inmate Identified</h4>
+            <hr>
+            <div class="row">
+                <div class="col-md-4">
+                    <img src="${inmate.photo_url || '/static/images/default-avatar.png'}" 
+                         class="img-fluid rounded" alt="Inmate Photo">
+                </div>
+                <div class="col-md-8">
+                    <table class="table table-sm">
+                        <tr><th>Inmate Number:</th><td>${inmate.inmate_number}</td></tr>
+                        <tr><th>Full Name:</th><td>${inmate.full_name}</td></tr>
+                        <tr><th>Total Admissions:</th><td>${inmate.total_admissions}</td></tr>
+                        <tr><th>Last Admission:</th><td>${inmate.current_admission_date}</td></tr>
+                        <tr><th>Match Confidence:</th><td>${score.toFixed(1)}%</td></tr>
+                    </table>
+                </div>
+            </div>
+            <hr>
+            <div class="d-grid gap-2">
+                <button class="btn btn-success btn-lg" onclick="proceedWithReturning(${inmate.inmate_id})">
+                    <i class="fas fa-check"></i> Proceed with Re-admission
+                </button>
+                <button class="btn btn-outline-secondary" onclick="showCandidateList()">
+                    <i class="fas fa-list"></i> View Other Candidates
+                </button>
+            </div>
+        </div>
+    `;
+}
+
+function displayNoMatchResult(template, quality) {
+    const resultDiv = document.getElementById('matchResult');
+    resultDiv.style.display = 'block';
+    resultDiv.innerHTML = `
+        <div class="alert alert-warning">
+            <h4><i class="fas fa-user-plus"></i> No Match Found - New Inmate</h4>
+            <p>This individual is not in the system. Proceed with new registration.</p>
+            <hr>
+            <div class="d-grid gap-2">
+                <button class="btn btn-primary btn-lg" onclick="proceedWithNewIntake('${template}', ${quality})">
+                    <i class="fas fa-user-plus"></i> Register New Inmate
+                </button>
+            </div>
+        </div>
+    `;
+}
+
+function proceedWithReturning(inmateId) {
+    window.location.href = `/inmate/readmission/${inmateId}`;
+}
+
+function proceedWithNewIntake(template, quality) {
+    // Store template in session storage for the intake form
+    sessionStorage.setItem('pendingFingerprint', template);
+    sessionStorage.setItem('fingerprintQuality', quality);
+    window.location.href = '/inmate/new-intake';
+}
+
+function cancelScan() {
+    if (scanAbortController) {
+        scanAbortController.abort();
+    }
+    scanInProgress = false;
+    bootstrap.Modal.getInstance(document.getElementById('biometricModal')).hide();
+}
+
+function getCSRFToken() {
+    return document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+}
+
+// Check scanner status on page load
+document.addEventListener('DOMContentLoaded', function() {
+    checkScannerStatus();
+    setInterval(checkScannerStatus, 30000); // Check every 30 seconds
+});
+
+async function checkScannerStatus() {
+    try {
+        const response = await fetch('http://127.0.0.1:5001/api/status');
+        const status = await response.json();
+        
+        const statusEl = document.getElementById('scannerStatus');
+        if (status.initialized) {
+            statusEl.textContent = 'Ready';
+            statusEl.parentElement.className = 'badge bg-success';
+        } else {
+            statusEl.textContent = 'Disconnected';
+            statusEl.parentElement.className = 'badge bg-danger';
+        }
+    } catch (error) {
+        document.getElementById('scannerStatus').textContent = 'Unavailable';
+        document.getElementById('scannerStatus').parentElement.className = 'badge bg-warning';
+    }
+}
+</script>
+
+<style>
+.pulse-animation {
+    animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+    0% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.1); opacity: 0.7; }
+    100% { transform: scale(1); opacity: 1; }
+}
+</style>
+{% endblock %}

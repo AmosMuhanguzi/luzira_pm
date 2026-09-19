@@ -1,0 +1,129 @@
+{% extends "admin/_layout.html" %}
+{% block title %}Request #{{ req.request_id }} — Luzira PMS{% endblock %}
+
+{% block admin_content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h3 class="mb-0"><i class="bi bi-file-diff"></i> Edit Request #{{ req.request_id }}</h3>
+    <a href="{{ url_for('edit_requests.list_requests', status=req.status) }}"
+       class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-arrow-left"></i> Back
+    </a>
+</div>
+
+<div class="card shadow-sm border-0 mb-3">
+    <div class="card-body">
+        <dl class="row mb-0">
+            <dt class="col-sm-3">Target</dt>
+            <dd class="col-sm-9">
+                {{ req.target_label or ('%s #%d' % (req.target_type, req.target_id)) }}
+                {% if inmate %}
+                · <a href="{{ url_for('inmate.detail', inmate_id=inmate.inmate_id) }}">View inmate</a>
+                {% endif %}
+            </dd>
+
+            <dt class="col-sm-3">Requested by</dt>
+            <dd class="col-sm-9">
+                {% if req.requestor %}
+                    {{ req.requestor.full_name }} ({{ req.requestor.role_name }})
+                {% else %}—{% endif %}
+            </dd>
+
+            <dt class="col-sm-3">Requested at</dt>
+            <dd class="col-sm-9">{{ req.requested_at.strftime('%Y-%m-%d %H:%M') }}</dd>
+
+            <dt class="col-sm-3">Status</dt>
+            <dd class="col-sm-9">
+                <span class="badge
+                    {% if req.status == 'Pending' %}bg-warning text-dark
+                    {% elif req.status == 'Approved' %}bg-success
+                    {% else %}bg-danger{% endif %}">
+                    {{ req.status }}
+                </span>
+            </dd>
+
+            {% if req.request_reason %}
+            <dt class="col-sm-3">Reason</dt>
+            <dd class="col-sm-9">{{ req.request_reason }}</dd>
+            {% endif %}
+
+            {% if req.reviewed_by %}
+            <dt class="col-sm-3">Reviewed by</dt>
+            <dd class="col-sm-9">
+                {{ req.reviewer.full_name }}
+                on {{ req.reviewed_at.strftime('%Y-%m-%d %H:%M') }}
+                {% if req.review_notes %} · {{ req.review_notes }}{% endif %}
+            </dd>
+            {% endif %}
+        </dl>
+    </div>
+</div>
+
+<div class="card shadow-sm border-0 mb-3">
+    <div class="card-header bg-dark text-white">
+        <i class="bi bi-list-check"></i> Proposed Changes ({{ req.change_count }})
+    </div>
+    <div class="table-responsive">
+        <table class="table table-sm mb-0">
+            <thead>
+                <tr>
+                    <th style="width: 30%">Field</th>
+                    <th style="width: 35%">Current</th>
+                    <th style="width: 35%">Proposed</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for field, delta in req.changes.items() %}
+                <tr>
+                    <td><strong>{{ field.replace('_', ' ')|title }}</strong></td>
+                    <td class="text-muted">
+                        {% if delta.old is none or delta.old == '' %}
+                            <em>(empty)</em>
+                        {% else %}
+                            {{ delta.old }}
+                        {% endif %}
+                    </td>
+                    <td class="text-success">
+                        {% if delta.new is none or delta.new == '' %}
+                            <em>(cleared)</em>
+                        {% else %}
+                            <strong>{{ delta.new }}</strong>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% if req.status == 'Pending' %}
+<div class="card shadow-sm border-0">
+    <div class="card-body">
+        <form method="POST"
+              action="{{ url_for('edit_requests.approve', request_id=req.request_id) }}"
+              class="d-inline">
+            <div class="mb-2">
+                <label class="form-label small">Notes (optional for approval)</label>
+                <input type="text" name="notes" class="form-control form-control-sm" maxlength="500">
+            </div>
+            <button class="btn btn-success">
+                <i class="bi bi-check2-circle"></i> Approve &amp; Apply
+            </button>
+        </form>
+
+        <form method="POST"
+              action="{{ url_for('edit_requests.reject', request_id=req.request_id) }}"
+              class="d-inline ms-2">
+            <div class="mb-2">
+                <label class="form-label small">Reason for rejection (required)</label>
+                <input type="text" name="notes" class="form-control form-control-sm"
+                       maxlength="500" required>
+            </div>
+            <button class="btn btn-outline-danger">
+                <i class="bi bi-x-circle"></i> Reject
+            </button>
+        </form>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

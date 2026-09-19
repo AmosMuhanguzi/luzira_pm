@@ -1,0 +1,69 @@
+{% extends "admin/_layout.html" %}
+{% block title %}Edit Requests — Luzira PMS{% endblock %}
+
+{% block admin_content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h3 class="mb-0"><i class="bi bi-inbox"></i> Edit Requests</h3>
+</div>
+
+<ul class="nav nav-pills mb-3">
+    {% for s in ['Pending','Approved','Rejected'] %}
+    <li class="nav-item">
+        <a class="nav-link {{ 'active' if status == s }}"
+           href="{{ url_for('edit_requests.list_requests', status=s) }}">
+            {{ s }}
+        </a>
+    </li>
+    {% endfor %}
+</ul>
+
+<div class="card shadow-sm border-0">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="table-dark">
+                <tr>
+                    <th>#</th>
+                    <th>Target</th>
+                    <th>Requested by</th>
+                    <th>When</th>
+                    <th>Fields</th>
+                    <th>Status</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for r in requests %}
+                <tr>
+                    <td><code>#{{ r.request_id }}</code></td>
+                    <td>{{ r.target_label or (r.target_type ~ ' #' ~ r.target_id) }}</td>
+                    <td>
+                        {% if r.requestor %}
+                            {{ r.requestor.full_name }}
+                            <span class="badge bg-secondary">{{ r.requestor.role_name }}</span>
+                        {% else %}—{% endif %}
+                    </td>
+                    <td class="small text-muted">{{ r.requested_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                    <td><span class="badge bg-info text-dark">{{ r.change_count }}</span></td>
+                    <td>
+                        <span class="badge
+                            {% if r.status == 'Pending' %}bg-warning text-dark
+                            {% elif r.status == 'Approved' %}bg-success
+                            {% else %}bg-danger{% endif %}">
+                            {{ r.status }}
+                        </span>
+                    </td>
+                    <td class="text-end">
+                        <a href="{{ url_for('edit_requests.view_request', request_id=r.request_id) }}"
+                           class="btn btn-sm btn-outline-primary">Review</a>
+                    </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="7" class="text-center text-muted py-4">
+                    No {{ status|lower }} requests.
+                </td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

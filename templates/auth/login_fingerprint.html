@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+{% block title %}Fingerprint Verification — Luzira PMS{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center" style="margin-top: 6vh;">
+    <div class="col-md-6 col-lg-5">
+        <div class="card shadow-lg border-0">
+            <div class="card-body p-4 p-md-5 text-center">
+
+                <i class="bi bi-fingerprint text-primary" style="font-size: 4rem;"></i>
+                <h3 class="mt-3 mb-1">Fingerprint Required</h3>
+                <p class="text-muted mb-4">
+                    Welcome, <strong>{{ user.full_name }}</strong>.<br>
+                    Place your registered finger on the scanner to complete sign-in.
+                </p>
+
+                <div id="scanPanel">
+                    <div id="scanIcon" class="mb-3">
+                        <i class="bi bi-fingerprint text-secondary" style="font-size: 5rem;"></i>
+                    </div>
+                    <h5 id="scanStatus">Waiting for scan…</h5>
+                    <p class="text-muted small" id="scanDetail">
+                        {% if mock_mode %}Mock mode active — click below to simulate a scan.{% endif %}
+                    </p>
+
+                    <div class="progress my-3" style="height: 8px;">
+                        <div id="scanProgress" class="progress-bar progress-bar-striped progress-bar-animated"
+                             style="width: 0%"></div>
+                    </div>
+
+                    <div class="d-grid gap-2">
+                        <button id="scanBtn" class="btn btn-primary btn-lg">
+                            <i class="bi bi-play-fill"></i> {% if mock_mode %}Simulate Scan{% else %}Scan Fingerprint{% endif %}
+                        </button>
+                        <a href="{{ url_for('auth.login') }}" class="btn btn-outline-secondary">
+                            Cancel and sign in again
+                        </a>
+                    </div>
+                </div>
+
+                <div id="successPanel" style="display:none;">
+                    <i class="bi bi-check-circle-fill text-success" style="font-size: 5rem;"></i>
+                    <h4 class="mt-3">Verified</h4>
+                    <p class="text-muted">Redirecting to your dashboard…</p>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const AGENT_URL = "{{ agent_url }}";
+const MOCK_MODE = {{ 'true' if mock_mode else 'false' }};
+const TOKEN = "{{ token }}";
+
+const scanBtn = document.getElementById('scanBtn');
+const scanStatus = document.getElementById('scanStatus');
+const scanDetail = document.getElementById('scanDetail');
+const scanIcon = document.getElementById('scanIcon');
+const scanProgress = document.getElementById('scanProgress');
+
+scanBtn.addEventListener('click', startScan);
+
+async function startScan() {
+    scanBtn.disabled = true;
+    scanStatus.textContent = 'Scanning…';
+    scanDetail.textContent = 'Keep your finger steady on the scanner.';
+    scanIcon.innerHTML = '<i class="bi bi-fingerprint text-primary pulse" style="font-size:5rem;"></i>';
+    animateProgress();
+
+    try {
+        const endpoint = MOCK_MODE ? '/api/mock-scan' : `${AGENT_URL}/api/scan`;
+        const resp = await fetch(endpoint, { method: 'POST' });
+        if (!resp.ok) throw new Error(`Agent error ${resp.status}`);
+        const scan = await resp.json();
+
+        if (!scan.success) throw new Error(scan.error || 'Scan failed');
+
+        scanStatus.textContent = 'Verifying…';
+        scanDetail.textContent = 'Comparing against your enrolled template.';
+
+        const verify = await fetch('/api/login/verify-fingerprint', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ token: TOKEN, template: scan.template })
+        });
+        const result = await verify.json();
+
+        if (result.ok) {
+            document.getElementById('scanPanel').style.display = 'none';
+            document.getElementById('successPanel').style.display = 'block';
+            setTimeout(() => { window.location.href = result.redirect; }, 800);
+        } else {
+            showError(result.error || 'Verification failed.');
+        }
+    } catch (err) {
+        showError(err.message);
+    } finally {
+        scanBtn.disabled = false;
+    }
+}
+
+function showError(msg) {
+    scanIcon.innerHTML = '<i class="bi bi-x-circle-fill text-danger" style="font-size:5rem;"></i>';
+    scanStatus.textContent = 'Verification failed';
+    scanDetail.textContent = msg;
+    scanProgress.style.width = '0%';
+}
+
+function animateProgress() {
+    let p = 0;
+    const t = setInterval(() => {
+        p = Math.min(p + 8, 90);
+        scanProgress.style.width = p + '%';
+    }, 100);
+    setTimeout(() => clearInterval(t), 2000);
+}
+</script>
+
+<style>
+.pulse { animation: pulse 1.2s infinite; }
+@keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .4; } }
+</style>
+{% endblock %}

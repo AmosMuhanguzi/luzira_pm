@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block title %}AI Alerts — Luzira PMS{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2 class="mb-0"><i class="bi bi-bell"></i> AI Alerts</h2>
+    <a href="{{ url_for('ai.dashboard') }}" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-arrow-left"></i> Back to dashboard
+    </a>
+</div>
+
+<ul class="nav nav-pills mb-3">
+    <li class="nav-item">
+        <a class="nav-link {{ 'active' if status == 'unreviewed' }}"
+           href="{{ url_for('ai.alerts', status='unreviewed') }}">Unreviewed</a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link {{ 'active' if status == 'reviewed' }}"
+           href="{{ url_for('ai.alerts', status='reviewed') }}">Reviewed</a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link {{ 'active' if status == 'all' }}"
+           href="{{ url_for('ai.alerts', status='all') }}">All</a>
+    </li>
+</ul>
+
+<div class="card shadow-sm border-0">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="table-dark">
+                <tr>
+                    <th>#</th>
+                    <th>When</th>
+                    <th>Type</th>
+                    <th>Target</th>
+                    <th>Severity</th>
+                    <th>Summary</th>
+                    <th>Status</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for a in alerts %}
+                <tr>
+                    <td>#{{ a.analysis_id }}</td>
+                    <td class="small text-muted">{{ a.analysis_timestamp.strftime('%Y-%m-%d %H:%M') }}</td>
+                    <td>{{ a.analysis_type }}</td>
+                    <td>{{ a.target_entity }}{% if a.target_id %} #{{ a.target_id }}{% endif %}</td>
+                    <td>
+                        <span class="badge
+                            {% if a.severity == 'Critical' %}bg-danger
+                            {% elif a.severity == 'High' %}bg-warning text-dark
+                            {% elif a.severity == 'Medium' %}bg-info
+                            {% else %}bg-secondary{% endif %}">
+                            {{ a.severity }}
+                        </span>
+                    </td>
+                    <td class="small">{{ a.result_summary[:120] }}{% if a.result_summary|length > 120 %}…{% endif %}</td>
+                    <td>
+                        {% if a.is_reviewed %}
+                            <span class="badge bg-success">Reviewed</span>
+                        {% else %}
+                            <span class="badge bg-warning text-dark">Pending</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-end">
+                        <a href="{{ url_for('ai.alert_detail', alert_id=a.analysis_id) }}"
+                           class="btn btn-sm btn-outline-primary">Open</a>
+                    </td>
+                </tr>
+            {% else %}
+                <tr><td colspan="8" class="text-center text-muted py-4">No alerts.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,200 @@
+{% extends "inmate/_layout.html" %}
+{% set editing = True %}
+{% block title %}Request Edit — {{ inmate.full_name }}{% endblock %}
+
+{% block inmate_content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h3 class="mb-0">
+        <i class="bi bi-pencil-square"></i> Request Edit
+    </h3>
+    <a href="{{ url_for('inmate.detail', inmate_id=inmate.inmate_id) }}"
+       class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-arrow-left"></i> Back to inmate
+    </a>
+</div>
+
+<div class="alert alert-warning">
+    <i class="bi bi-info-circle"></i>
+    <strong>Edits require approval.</strong>
+    Your changes will be submitted as a request. The System Administrator
+    must approve before they appear on the inmate's record.
+    {% if has_permission(Permissions.INMATE_EDIT_APPROVE) %}
+    <hr class="my-2">
+    <strong>You are an administrator</strong> — your changes will be applied immediately.
+    {% endif %}
+</div>
+
+<form method="POST" novalidate>
+    <input type="hidden" name="target_label" value="{{ inmate.inmate_number }}">
+
+    <div class="card shadow-sm border-0 mb-3">
+        <div class="card-header bg-dark text-white"><i class="bi bi-person"></i> Personal</div>
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label">Full name</label>
+                    <input type="text" name="full_name" class="form-control"
+                           value="{{ data.full_name or inmate.full_name }}">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Date of birth</label>
+                    <input type="date" name="date_of_birth" class="form-control"
+                           value="{{ data.date_of_birth or inmate.date_of_birth }}">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Gender</label>
+                    <select name="gender" class="form-select">
+                        {% for g in ['Male','Female'] %}
+                        <option value="{{ g }}"
+                            {{ 'selected' if (data.gender or inmate.gender) == g }}>{{ g }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Nationality</label>
+                    <input type="text" name="nationality" class="form-control"
+                           value="{{ data.nationality or inmate.nationality }}">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">National ID №</label>
+                    <input type="text" name="national_id_number" class="form-control"
+                           value="{{ data.national_id_number or inmate.national_id_number or '' }}">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Tribe</label>
+                    <input type="text" name="tribe" class="form-control"
+                           value="{{ data.tribe or inmate.tribe or '' }}">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Religion</label>
+                    <input type="text" name="religion" class="form-control"
+                           value="{{ data.religion or inmate.religion or '' }}">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card shadow-sm border-0 mb-3">
+        <div class="card-header bg-dark text-white"><i class="bi bi-telephone"></i> Next of Kin</div>
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <label class="form-label">Name</label>
+                    <input type="text" name="next_of_kin_name" class="form-control"
+                           value="{{ data.next_of_kin_name or inmate.next_of_kin_name or '' }}">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Relationship</label>
+                    <input type="text" name="next_of_kin_relationship" class="form-control"
+                           value="{{ data.next_of_kin_relationship or inmate.next_of_kin_relationship or '' }}">
+                </div>
+                <div class="col-md-5">
+                    <label class="form-label">Phone</label>
+                    <input type="text" name="next_of_kin_phone" class="form-control"
+                           value="{{ data.next_of_kin_phone or inmate.next_of_kin_phone or '' }}">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card shadow-sm border-0 mb-3">
+        <div class="card-header bg-dark text-white"><i class="bi bi-bank"></i> Legal</div>
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <label class="form-label">Crime category</label>
+                    <select name="crime_category" class="form-select">
+                        <option value="">--</option>
+                        {% for c in ['Murder','Rape','Armed Robbery','Robbery','Theft','Assault',
+                                     'Fraud','Drug Offence','Kidnapping','Treason','Other'] %}
+                        <option value="{{ c }}"
+                            {{ 'selected' if (data.crime_category or inmate.crime_category) == c }}>{{ c }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Court case №</label>
+                    <input type="text" name="court_case_number" class="form-control"
+                           value="{{ data.court_case_number or inmate.court_case_number or '' }}">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Sentence type</label>
+                    <input type="text" name="sentence_type" class="form-control"
+                           value="{{ data.sentence_type or inmate.sentence_type or '' }}">
+                </div>
+                <div class="col-md-8">
+                    <label class="form-label">Crime description</label>
+                    <textarea name="crime_description" class="form-control" rows="2">{{ data.crime_description or inmate.crime_description or '' }}</textarea>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Expected release date</label>
+                    <input type="date" name="expected_release_date" class="form-control"
+                           value="{{ data.expected_release_date or inmate.expected_release_date or '' }}">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card shadow-sm border-0 mb-3">
+        <div class="card-header bg-dark text-white"><i class="bi bi-geo"></i> Facility</div>
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-3">
+                    <label class="form-label">Cell block</label>
+                    <input type="text" name="cell_block" class="form-control"
+                           value="{{ data.cell_block or inmate.cell_block or '' }}">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Cell number</label>
+                    <input type="text" name="cell_number" class="form-control"
+                           value="{{ data.cell_number or inmate.cell_number or '' }}">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Security class</label>
+                    <select name="security_classification" class="form-select">
+                        {% for s in ['Minimum','Medium','Maximum'] %}
+                        <option value="{{ s }}"
+                            {{ 'selected' if (data.security_classification or inmate.security_classification) == s }}>{{ s }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Height (cm)</label>
+                    <input type="number" name="height_cm" class="form-control"
+                           value="{{ data.height_cm or inmate.height_cm or '' }}">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card shadow-sm border-0 mb-3">
+        <div class="card-header bg-dark text-white"><i class="bi bi-heart-pulse"></i> Medical</div>
+        <div class="card-body">
+            <div class="form-check mb-2">
+                <input type="checkbox" name="has_medical_condition" class="form-check-input"
+                       id="hmc"
+                       {{ 'checked' if data.has_medical_condition or inmate.has_medical_condition }}>
+                <label class="form-check-label" for="hmc">Has known medical condition</label>
+            </div>
+            <label class="form-label">Medical alert / notes</label>
+            <textarea name="medical_alert" class="form-control" rows="2">{{ data.medical_alert or inmate.medical_alert or '' }}</textarea>
+        </div>
+    </div>
+
+    <div class="card shadow-sm border-0 mb-3">
+        <div class="card-header bg-dark text-white"><i class="bi bi-chat-left-text"></i> Reason for edit</div>
+        <div class="card-body">
+            <textarea name="request_reason" class="form-control" rows="2"
+                      placeholder="Explain why this change is needed (optional for admin, recommended for others)">{{ data.request_reason or '' }}</textarea>
+        </div>
+    </div>
+
+    <div class="d-flex justify-content-end gap-2 mb-4">
+        <a href="{{ url_for('inmate.detail', inmate_id=inmate.inmate_id) }}"
+           class="btn btn-outline-secondary">Cancel</a>
+        <button type="submit" class="btn btn-primary btn-lg">
+            <i class="bi bi-send-check"></i> Submit for Approval
+        </button>
+    </div>
+</form>
+{% endblock %}

@@ -1,0 +1,27 @@
+/* static/css/style.css */
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+.card {
+    border-radius: 0.75rem;
+}
+
+.navbar-brand {
+    font-weight: 600;
+    letter-spacing: 0.5px;
+}
+
+.alert {
+    border-radius: 0.5rem;
+}
+
+footer {
+    border-top: 1px solid #e9ecef;
+    margin-top: 3rem;
+}
+
+/* Login card hover */
+.card.shadow-lg {
+    transition: transform 0.2s ease-in-out;
+}

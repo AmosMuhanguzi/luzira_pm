@@ -1,0 +1,326 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — Luzira PMS{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <h2 class="mb-1"><i class="bi bi-speedometer2"></i> Dashboard</h2>
+        <p class="text-muted mb-0">
+            Signed in as <strong>{{ current_user.full_name }}</strong>
+            &middot; Role: <span class="badge bg-primary">{{ role }}</span>
+        </p>
+    </div>
+</div>
+
+{# ============================================================== #}
+{#  SYSTEM ADMINISTRATOR                                          #}
+{# ============================================================== #}
+{% if role == 'System Administrator' %}
+<div class="row g-4">
+
+    <div class="col-md-6 col-lg-4">
+        <a href="{{ url_for('admin.users_list') }}" class="text-decoration-none">
+            <div class="card h-100 shadow-sm border-0 card-hover">
+                <div class="card-body">
+                    <i class="bi bi-people-fill fs-1 text-primary"></i>
+                    <h5 class="mt-3 text-dark">Staff Users</h5>
+                    <p class="text-muted small mb-0">
+                        Create, edit, reset passwords, and manage fingerprints for staff.
+                    </p>
+                </div>
+            </div>
+        </a>
+    </div>
+
+    <div class="col-md-6 col-lg-4">
+        <a href="{{ url_for('admin.user_new') }}" class="text-decoration-none">
+            <div class="card h-100 shadow-sm border-0 card-hover">
+                <div class="card-body">
+                    <i class="bi bi-person-plus-fill fs-1 text-success"></i>
+                    <h5 class="mt-3 text-dark">Add New User</h5>
+                    <p class="text-muted small mb-0">
+                        Register a new staff member. They enrol a fingerprint on first login.
+                    </p>
+                </div>
+            </div>
+        </a>
+    </div>
+
+    <div class="col-md-6 col-lg-4">
+        <a href="{{ url_for('edit_requests.list_requests') }}" class="text-decoration-none">
+            <div class="card h-100 shadow-sm border-0 card-hover">
+                <div class="card-body">
+                    <i class="bi bi-inbox fs-1 text-danger"></i>
+                    <h5 class="mt-3 text-dark">
+                        Edit Requests
+                        {% set pc = pending_edit_count() %}
+                        {% if pc > 0 %}
+                        <span class="badge bg-danger">{{ pc }}</span>
+                        {% endif %}
+                    </h5>
+                    <p class="text-muted small mb-0">
+                        Review and approve changes requested by staff.
+                    </p>
+                </div>
+            </div>
+        </a>
+    </div>
+
+    <div class="col-md-6 col-lg-4">
+        <a href="{{ url_for('inmate.intake_scan') }}" class="text-decoration-none">
+            <div class="card h-100 shadow-sm border-0 card-hover">
+                <div class="card-body">
+                    <i class="bi bi-fingerprint fs-1 text-warning"></i>
+                    <h5 class="mt-3 text-dark">New Inmate Intake</h5>
+                    <p class="text-muted small mb-0">
+                        Scan fingerprint, run 1:N match, register or re-admit.
+                    </p>
+                </div>
+            </div>
+        </a>
+    </div>
+
+    <div class="col-md-6 col-lg-4">
+        <a href="{{ url_for('inmate.list_inmates') }}" class="text-decoration-none">
+            <div class="card h-100 shadow-sm border-0 card-hover">
+                <div class="card-body">
+                    <i class="bi bi-person-vcard fs-1 text-info"></i>
+                    <h5 class="mt-3 text-dark">Inmate Records</h5>
+                    <p class="text-muted small mb-0">
+                        View and manage all inmate records.
+                    </p>
+                </div>
+            </div>
+        </a>
+    </div>
+
+    <div class="col-md-6 col-lg-4">
+        <div class="card h-100 shadow-sm border-0 bg-light">
+            <div class="card-body">
+                <i class="bi bi-shield-lock-fill fs-1 text-secondary"></i>
+                <h5 class="mt-3">System Settings</h5>
+                <p class="text-muted small mb-0">Coming next.</p>
+                <span class="badge bg-secondary mt-2">Planned</span>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6 col-lg-4">
+        <a href="{{ url_for('visitor.scan') }}" class="text-decoration-none">
+            <div class="card h-100 shadow-sm border-0 card-hover">
+                <div class="card-body">
+                    <i class="bi bi-fingerprint fs-1 text-success"></i>
+                    <h5 class="mt-3 text-dark">Visitor Check-in</h5>
+                    <p class="text-muted small mb-0">
+                        Scan visitor fingerprint and log visits.
+                    </p>
+                </div>
+            </div>
+        </a>
+    </div>
+        <div class="col-md-6 col-lg-4">
+        <a href="{{ url_for('ai.dashboard') }}" class="text-decoration-none">
+            <div class="card h-100 shadow-sm border-0 card-hover">
+                <div class="card-body">
+                    <i class="bi bi-robot fs-1 text-success"></i>
+                    <h5 class="mt-3 text-dark">AI Analytics</h5>
+                    <p class="text-muted small mb-0">
+                        Anomaly detection, population forecast, risk scoring.
+                    </p>
+                </div>
+            </div>
+        </a>
+    </div>
+
+</div>
+{% endif %}
+
+{# ============================================================== #}
+{#  WARDEN                                                        #}
+{# ============================================================== #}
+{% if role == 'Warden' %}
+<div class="row g-4">
+    <div class="col-md-6 col-lg-4">
+        <a href="{{ url_for('inmate.list_inmates') }}" class="text-decoration-none">
+            <div class="card h-100 shadow-sm border-0 card-hover">
+                <div class="card-body">
+                    <i class="bi bi-person-vcard fs-1 text-primary"></i>
+                    <h5 class="mt-3 text-dark">Inmate Records</h5>
+                    <p class="text-muted small mb-0">View all inmate records.</p>
+                </div>
+            </div>
+        </a>
+    </div>
+
+    <div class="col-md-6 col-lg-4">
+        <a href="{{ url_for('edit_requests.my_requests') }}" class="text-decoration-none">
+            <div class="card h-100 shadow-sm border-0 card-hover">
+                <div class="card-body">
+                    <i class="bi bi-send-check fs-1 text-warning"></i>
+                    <h5 class="mt-3 text-dark">My Edit Requests</h5>
+                    <p class="text-muted small mb-0">
+                        Track the status of changes you've submitted.
+                    </p>
+                </div>
+            </div>
+        </a>
+    </div>
+
+    <div class="col-md-6 col-lg-4">
+        <div class="card h-100 shadow-sm border-0 bg-light">
+            <div class="card-body">
+                <i class="bi bi-robot fs-1 text-secondary"></i>
+                <h5 class="mt-3">AI Analytics</h5>
+                <p class="text-muted small mb-0">Coming next.</p>
+                <span class="badge bg-secondary mt-2">Planned</span>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{# ============================================================== #}
+{#  RECORDS OFFICER                                               #}
+{# ============================================================== #}
+{% if role == 'Records Officer' %}
+<div class="row g-4">
+    <div class="col-md-6 col-lg-4">
+        <a href="{{ url_for('inmate.list_inmates') }}" class="text-decoration-none">
+            <div class="card h-100 shadow-sm border-0 card-hover">
+                <div class="card-body">
+                    <i class="bi bi-person-vcard fs-1 text-primary"></i>
+                    <h5 class="mt-3 text-dark">Inmate Records</h5>
+                    <p class="text-muted small mb-0">View, edit-request, and manage inmates.</p>
+                </div>
+            </div>
+        </a>
+    </div>
+
+    <div class="col-md-6 col-lg-4">
+        <a href="{{ url_for('edit_requests.my_requests') }}" class="text-decoration-none">
+            <div class="card h-100 shadow-sm border-0 card-hover">
+                <div class="card-body">
+                    <i class="bi bi-send-check fs-1 text-warning"></i>
+                    <h5 class="mt-3 text-dark">My Edit Requests</h5>
+                    <p class="text-muted small mb-0">
+                        Track the status of changes you've submitted.
+                    </p>
+                </div>
+            </div>
+        </a>
+    </div>
+</div>
+{% endif %}
+
+{# ============================================================== #}
+{#  RECEPTIONIST                                                  #}
+{# ============================================================== #}
+{% if role == 'Receptionist' %}
+<div class="row g-4">
+    <div class="col-md-6 col-lg-4">
+        <a href="{{ url_for('inmate.intake_scan') }}" class="text-decoration-none">
+            <div class="card h-100 shadow-sm border-0 card-hover">
+                <div class="card-body">
+                    <i class="bi bi-fingerprint fs-1 text-warning"></i>
+                    <h5 class="mt-3 text-dark">New Inmate Intake</h5>
+                    <p class="text-muted small mb-0">
+                        Scan fingerprint, run 1:N match, register or re-admit.
+                    </p>
+                </div>
+            </div>
+        </a>
+    </div>
+
+    <div class="col-md-6 col-lg-4">
+        <a href="{{ url_for('inmate.list_inmates') }}" class="text-decoration-none">
+            <div class="card h-100 shadow-sm border-0 card-hover">
+                <div class="card-body">
+                    <i class="bi bi-person-vcard fs-1 text-primary"></i>
+                    <h5 class="mt-3 text-dark">Inmate Records</h5>
+                    <p class="text-muted small mb-0">
+                        View inmate records. Request edits when corrections are needed.
+                    </p>
+                </div>
+            </div>
+        </a>
+    </div>
+
+    <div class="col-md-6 col-lg-4">
+        <a href="{{ url_for('edit_requests.my_requests') }}" class="text-decoration-none">
+            <div class="card h-100 shadow-sm border-0 card-hover">
+                <div class="card-body">
+                    <i class="bi bi-send-check fs-1 text-info"></i>
+                    <h5 class="mt-3 text-dark">My Edit Requests</h5>
+                    <p class="text-muted small mb-0">
+                        Track the status of changes you've submitted.
+                    </p>
+                </div>
+            </div>
+        </a>
+    </div>
+
+    <div class="col-md-6 col-lg-4">
+        <a href="{{ url_for('visitor.scan') }}" class="text-decoration-none">
+            <div class="card h-100 shadow-sm border-0 card-hover">
+                <div class="card-body">
+                    <i class="bi bi-fingerprint fs-1 text-success"></i>
+                    <h5 class="mt-3 text-dark">Visitor Check-in</h5>
+                    <p class="text-muted small mb-0">
+                        Scan visitor fingerprint and log visits.
+                    </p>
+                </div>
+            </div>
+        </a>
+    </div>
+        
+        </a>
+    </div>
+
+</div>
+{% endif %}
+
+{# ============================================================== #}
+{#  SECURITY OFFICER                                              #}
+{# ============================================================== #}
+{% if role == 'Security Officer' %}
+<div class="row g-4">
+    <div class="col-md-6 col-lg-4">
+        <a href="{{ url_for('edit_requests.my_requests') }}" class="text-decoration-none">
+            <div class="card h-100 shadow-sm border-0 card-hover">
+                <div class="card-body">
+                    <i class="bi bi-send-check fs-1 text-warning"></i>
+                    <h5 class="mt-3 text-dark">My Edit Requests</h5>
+                    <p class="text-muted small mb-0">
+                        Track the status of changes you've submitted.
+                    </p>
+                </div>
+            </div>
+        </a>
+    </div>
+
+        <div class="col-md-6 col-lg-4">
+        <a href="{{ url_for('visitor.scan') }}" class="text-decoration-none">
+            <div class="card h-100 shadow-sm border-0 card-hover">
+                <div class="card-body">
+                    <i class="bi bi-fingerprint fs-1 text-success"></i>
+                    <h5 class="mt-3 text-dark">Visitor Check-in</h5>
+                    <p class="text-muted small mb-0">
+                        Scan visitor fingerprint and log visits.
+                    </p>
+                </div>
+            </div>
+        </a>
+    </div>
+
+</div>
+{% endif %}
+
+{# ============================================================== #}
+{#  FALLBACK — unknown role                                       #}
+{# ============================================================== #}
+{% if role not in ['System Administrator','Warden','Records Officer','Receptionist','Security Officer'] %}
+<div class="alert alert-warning">
+    Your role (<strong>{{ role }}</strong>) has no dashboard cards configured yet.
+</div>
+{% endif %}
+
+{% endblock %}

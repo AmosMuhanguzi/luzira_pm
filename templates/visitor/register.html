@@ -1,0 +1,116 @@
+{% extends "visitor/_layout.html" %}
+{% block title %}Register Visitor — Luzira PMS{% endblock %}
+
+{% block visitor_content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h3 class="mb-0"><i class="bi bi-person-plus"></i> Register Visitor</h3>
+    <a href="{{ url_for('visitor.list_visitors') }}"
+       class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-arrow-left"></i> Back
+    </a>
+</div>
+
+{% if has_probe %}
+<div class="alert alert-success">
+    <i class="bi bi-check-circle"></i> Fingerprint captured — will be enrolled on save.
+</div>
+{% else %}
+<div class="alert alert-warning">
+    <i class="bi bi-exclamation-triangle"></i>
+    No fingerprint captured. <a href="{{ url_for('visitor.scan') }}">Run a scan</a>
+    first, or continue without biometric (not recommended).
+</div>
+{% endif %}
+
+<form method="POST" novalidate>
+    <div class="card shadow-sm border-0 mb-3">
+        <div class="card-header bg-dark text-white"><i class="bi bi-person"></i> Personal</div>
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label">Full name *</label>
+                    <input type="text" name="full_name" class="form-control" required
+                           value="{{ data.full_name or '' }}">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Date of birth</label>
+                    <input type="date" name="date_of_birth" class="form-control"
+                           value="{{ data.date_of_birth or '' }}">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Gender</label>
+                    <select name="gender" class="form-select">
+                        <option value="">--</option>
+                        {% for g in ['Male','Female'] %}
+                        <option value="{{ g }}"
+                            {{ 'selected' if data.gender == g }}>{{ g }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Nationality</label>
+                    <input type="text" name="nationality" class="form-control"
+                           value="{{ data.nationality or 'Ugandan' }}">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">ID type</label>
+                    <select name="id_type" class="form-select">
+                        <option value="">--</option>
+                        {% for t in ['National ID','Passport','Driver License','Other'] %}
+                        <option value="{{ t }}"
+                            {{ 'selected' if data.id_type == t }}>{{ t }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">ID number</label>
+                    <input type="text" name="id_number" class="form-control"
+                           value="{{ data.id_number or '' }}">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card shadow-sm border-0 mb-3">
+        <div class="card-header bg-dark text-white"><i class="bi bi-telephone"></i> Contact</div>
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <label class="form-label">Phone number *</label>
+                    <input type="text" name="phone_number" class="form-control" required
+                           value="{{ data.phone_number or '' }}">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Email</label>
+                    <input type="email" name="email" class="form-control"
+                           value="{{ data.email or '' }}">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Relationship to inmate</label>
+                    <select name="relationship_to_inmate" class="form-select" required>
+                        <option value="">--</option>
+                        {% for r in ['Spouse','Parent','Sibling','Child','Friend',
+                                     'Lawyer','Clergy','Other'] %}
+                        <option value="{{ r }}"
+                            {{ 'selected' if data.relationship_to_inmate == r }}>{{ r }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-12">
+                    <label class="form-label">Physical address</label>
+                    <textarea name="physical_address" class="form-control"
+                              rows="2">{{ data.physical_address or '' }}</textarea>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="d-flex justify-content-end gap-2 mb-4">
+        <a href="{{ url_for('visitor.list_visitors') }}"
+           class="btn btn-outline-secondary">Cancel</a>
+        <button type="submit" class="btn btn-primary btn-lg">
+            <i class="bi bi-check2-circle"></i> Register &amp; Continue to Check-in
+        </button>
+    </div>
+</form>
+{% endblock %}

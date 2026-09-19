@@ -1,0 +1,111 @@
+{% extends "inmate/_layout.html" %}
+{% block title %}Inmates — Luzira PMS{% endblock %}
+
+{% block inmate_content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h3 class="mb-0"><i class="bi bi-people-fill"></i> Inmate Records</h3>
+    <a href="{{ url_for('inmate.intake_scan') }}" class="btn btn-primary">
+        <i class="bi bi-fingerprint"></i> New Intake
+    </a>
+</div>
+
+<form method="GET" class="row g-2 mb-3">
+    <div class="col-md-6">
+        <input type="text" name="q" value="{{ search }}" class="form-control"
+               placeholder="Search name, inmate number or crime…">
+    </div>
+    <div class="col-md-3">
+        <select name="status" class="form-select">
+            <option value="">All statuses</option>
+            {% for s in ['Active','Released','Transferred','Deceased','Escaped'] %}
+            <option value="{{ s }}" {{ 'selected' if status == s }}>{{ s }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="col-md-3">
+        <button class="btn btn-outline-secondary w-100">
+            <i class="bi bi-search"></i> Filter
+        </button>
+    </div>
+</form>
+
+<div class="card shadow-sm border-0">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="table-dark">
+                <tr>
+                    <th>Inmate №</th>
+                    <th>Name</th>
+                    <th>Crime</th>
+                    <th>Cell</th>
+                    <th>Admissions</th>
+                    <th>Status</th>
+                    <th>Bio</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for i in inmates %}
+                <tr>
+                    <td><code>{{ i.inmate_number }}</code></td>
+                    <td>
+                        <div class="fw-semibold">{{ i.full_name }}</div>
+                        <div class="text-muted small">DOB: {{ i.date_of_birth }}</div>
+                    </td>
+                    <td>{{ i.crime_category or '—' }}</td>
+                    <td>{{ i.cell_block or '—' }}</td>
+                    <td>{{ i.total_admissions }}</td>
+                    <td>
+                        {% set st = i.status|lower %}
+                        <span class="badge
+                            {% if st == 'active' %}bg-success
+                            {% elif st == 'released' %}bg-secondary
+                            {% elif st == 'transferred' %}bg-info
+                            {% else %}bg-danger{% endif %}">
+                            {{ i.status }}
+                        </span>
+                    </td>
+                    <td>
+                        {% if i.biometric_enrolled %}
+                            <i class="bi bi-fingerprint text-success"></i>
+                        {% else %}
+                            <i class="bi bi-fingerprint text-muted"></i>
+                        {% endif %}
+                    </td>
+                    <td class="text-end">
+                        <a href="{{ url_for('inmate.detail', inmate_id=i.inmate_id) }}"
+                           class="btn btn-sm btn-outline-primary">View</a>
+                    </td>
+                </tr>
+            {% else %}
+                <tr><td colspan="8" class="text-center text-muted py-4">
+                    No inmates yet. Click <strong>New Intake</strong> to register the first one.
+                </td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% if pagination.pages > 1 %}
+<nav class="mt-3">
+    <ul class="pagination justify-content-center">
+        <li class="page-item {{ 'disabled' if not pagination.has_prev }}">
+            <a class="page-link" href="{{ url_for('inmate.list_inmates', page=pagination.prev_num, q=search, status=status) }}">&laquo;</a>
+        </li>
+        {% for p in pagination.iter_pages() %}
+            {% if p %}
+            <li class="page-item {{ 'active' if p == pagination.page }}">
+                <a class="page-link" href="{{ url_for('inmate.list_inmates', page=p, q=search, status=status) }}">{{ p }}</a>
+            </li>
+            {% else %}
+            <li class="page-item disabled"><span class="page-link">…</span></li>
+            {% endif %}
+        {% endfor %}
+        <li class="page-item {{ 'disabled' if not pagination.has_next }}">
+            <a class="page-link" href="{{ url_for('inmate.list_inmates', page=pagination.next_num, q=search, status=status) }}">&raquo;</a>
+        </li>
+    </ul>
+</nav>
+{% endif %}
+{% endblock %}

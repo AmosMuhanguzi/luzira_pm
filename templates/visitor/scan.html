@@ -1,0 +1,185 @@
+{% extends "visitor/_layout.html" %}
+{% block title %}Visitor Gate Scan — Luzira PMS{% endblock %}
+
+{% block visitor_content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h3 class="mb-0"><i class="bi bi-fingerprint"></i> Visitor Gate Scan</h3>
+    <a href="{{ url_for('visitor.list_visitors') }}"
+       class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-arrow-left"></i> Back
+    </a>
+</div>
+
+<div class="card shadow-sm border-0">
+    <div class="card-body text-center py-5">
+        <div id="scanPanel">
+            <div id="scanIcon" class="mb-4">
+                <i class="bi bi-fingerprint text-primary" style="font-size: 6rem;"></i>
+            </div>
+            <h3 id="scanStatus">Ready to scan visitor</h3>
+            <p class="text-muted" id="scanDetail">
+                Place the visitor's right index finger on the scanner.
+            </p>
+
+            <div class="progress my-4 mx-auto" style="max-width: 400px; height: 8px;">
+                <div id="scanProgress"
+                     class="progress-bar progress-bar-striped progress-bar-animated"
+                     style="width: 0%"></div>
+            </div>
+
+            <button id="scanBtn" class="btn btn-primary btn-lg px-5">
+                <i class="bi bi-play-fill"></i>
+                {% if mock_mode %}Simulate Scan{% else %}Start Scan{% endif %}
+            </button>
+
+            <p class="text-muted small mt-3">
+                Enrolled visitors:
+                <span class="badge bg-secondary" id="enrolledCount">?</span>
+            </p>
+        </div>
+
+        <div id="resultPanel" style="display:none;">
+            <div id="resultIcon"></div>
+            <h3 id="resultTitle" class="mt-3"></h3>
+            <p class="text-muted" id="resultDetail"></p>
+
+            <div id="matchedCard" class="card mt-3 mx-auto"
+                 style="max-width: 500px; display:none;">
+                <div class="card-body text-start">
+                    <h5 id="mFullName"></h5>
+                    <table class="table table-sm mb-0">
+                        <tr><th>Visitor №</th><td id="mNumber"></td></tr>
+                        <tr><th>Phone</th><td id="mPhone"></td></tr>
+                        <tr><th>Relationship</th><td id="mRelationship"></td></tr>
+                        <tr><th>Visits so far</th><td id="mVisits"></td></tr>
+                        <tr><th>Match confidence</th><td id="mScore"></td></tr>
+                    </table>
+                    <div id="mWarning" class="alert alert-danger mt-2 mb-0" style="display:none;"></div>
+                </div>
+            </div>
+
+            <div class="d-grid gap-2 mt-4 mx-auto" style="max-width: 400px;">
+                <a id="proceedBtn" href="#" class="btn btn-success btn-lg">
+                    <i class="bi bi-arrow-right-circle"></i>
+                    <span id="proceedLabel">Proceed</span>
+                </a>
+                <button id="rescanBtn" class="btn btn-outline-secondary">
+                    <i class="bi bi-arrow-clockwise"></i> Scan Again
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const SCAN_URL = "{{ url_for('visitor.api_scan_identify') }}";
+
+const scanBtn      = document.getElementById('scanBtn');
+const scanStatus   = document.getElementById('scanStatus');
+const scanDetail   = document.getElementById('scanDetail');
+const scanIcon     = document.getElementById('scanIcon');
+const scanProgress = document.getElementById('scanProgress');
+const scanPanel    = document.getElementById('scanPanel');
+const resultPanel  = document.getElementById('resultPanel');
+
+scanBtn.addEventListener('click', doScan);
+document.getElementById('rescanBtn').addEventListener('click', () => {
+    resultPanel.style.display = 'none';
+    scanPanel.style.display = 'block';
+    scanBtn.disabled = false;
+});
+
+async function doScan() {
+    scanBtn.disabled = true;
+    scanStatus.textContent = 'Scanning…';
+    scanDetail.textContent = 'Hold the finger steady.';
+    scanIcon.innerHTML = '<i class="bi bi-fingerprint text-primary pulse" style="font-size:6rem;"></i>';
+    scanProgress.style.width = '0%';
+    animateBar();
+
+    try {
+        const r = await fetch(SCAN_URL, { method: 'POST' });
+        const data = await r.json();
+        if (!data.ok) throw new Error(data.error || 'Scan failed');
+        showResult(data);
+    } catch (err) {
+        scanIcon.innerHTML = '<i class="bi bi-x-circle-fill text-danger" style="font-size:6rem;"></i>';
+        scanStatus.textContent = 'Error';
+        scanDetail.textContent = err.message;
+        scanBtn.disabled = false;
+    } finally {
+        scanProgress.style.width = '100%';
+    }
+}
+
+function showResult(data) {
+    scanPanel.style.display = 'none';
+    resultPanel.style.display = 'block';
+
+    const icon = document.getElementById('resultIcon');
+    const title = document.getElementById('resultTitle');
+    const detail = document.getElementById('resultDetail');
+    const matchedCard = document.getElementById('matchedCard');
+    const proceed = document.getElementById('proceedBtn');
+    const proceedLabel = document.getElementById('proceedLabel');
+    const warning = document.getElementById('mWarning');
+
+    document.getElementById('enrolledCount').textContent = data.enrolled_count;
+
+    if (data.match) {
+        icon.innerHTML = '<i class="bi bi-check-circle-fill text-success" style="font-size:6rem;"></i>';
+        title.textContent = 'Returning Visitor Identified';
+        detail.textContent = `Match confidence: ${data.score}%`;
+        matchedCard.style.display = 'block';
+        document.getElementById('mFullName').textContent    = data.visitor.full_name;
+        document.getElementById('mNumber').textContent      = data.visitor.visitor_number;
+        document.getElementById('mPhone').textContent       = data.visitor.phone_number || '—';
+        document.getElementById('mRelationship').textContent= data.visitor.relationship_to_inmate || '—';
+        document.getElementById('mVisits').textContent      = data.visitor.total_visits;
+        document.getElementById('mScore').textContent       = data.score + '%';
+
+        let block = false;
+        if (data.visitor.is_blacklisted) {
+            warning.textContent = '⚠ This visitor is blacklisted. Entry must be denied.';
+            warning.style.display = 'block';
+            block = true;
+        } else if (data.visitor.anomaly_flag) {
+            warning.textContent = '⚠ AI has flagged this visitor for unusual patterns. Review carefully.';
+            warning.style.display = 'block';
+        } else {
+            warning.style.display = 'none';
+        }
+
+        proceed.href = data.redirect;
+        proceedLabel.textContent = 'Continue to Check-in';
+        if (block) {
+            proceed.classList.add('disabled');
+            proceedLabel.textContent = 'Blocked — Do Not Admit';
+        }
+    } else {
+        icon.innerHTML = '<i class="bi bi-person-plus-fill text-warning" style="font-size:6rem;"></i>';
+        title.textContent = 'No Match — New Visitor';
+        detail.textContent = 'Best score ' + data.score + '%. Register the visitor now.';
+        matchedCard.style.display = 'none';
+        proceed.href = data.redirect;
+        proceedLabel.textContent = 'Register New Visitor';
+        proceed.classList.remove('disabled');
+    }
+}
+
+function animateBar() {
+    let p = 0;
+    const t = setInterval(() => {
+        p = Math.min(p + 6, 90);
+        scanProgress.style.width = p + '%';
+        if (p >= 90) clearInterval(t);
+    }, 100);
+}
+</script>
+<style>
+.pulse { animation: pulse 1.2s infinite; }
+@keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .4; } }
+</style>
+{% endblock %}

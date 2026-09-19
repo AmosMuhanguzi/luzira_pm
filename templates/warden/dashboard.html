@@ -1,0 +1,381 @@
+<!-- templates/warden/dashboard.html -->
+{% extends "base.html" %}
+
+{% block title %}Warden Dashboard - Luzira PMS{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h2><i class="fas fa-shield-alt"></i> Warden Dashboard</h2>
+                    <p class="text-muted">Welcome, {{ current_user.full_name }}</p>
+                </div>
+                <div>
+                    <span class="badge bg-{{ 'danger' if critical_alerts > 0 else 'success' }} p-2">
+                        <i class="fas fa-bell"></i> {{ critical_alerts }} Critical Alerts
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- AI Alerts Panel -->
+    {% if ai_alerts %}
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card border-danger">
+                <div class="card-header bg-danger text-white">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0"><i class="fas fa-robot"></i> AI Security Alerts</h5>
+                        <button class="btn btn-sm btn-light" onclick="refreshAlerts()">
+                            <i class="fas fa-sync"></i> Refresh
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    {% for alert in ai_alerts %}
+                    <div class="alert alert-{{ alert.severity_class }} alert-dismissible fade show" role="alert">
+                        <div class="d-flex justify-content-between">
+                            <div>
+                                <h6 class="alert-heading">
+                                    <i class="fas fa-exclamation-triangle"></i> 
+                                    {{ alert.title }}
+                                    <span class="badge bg-{{ alert.severity_class }}">{{ alert.severity }}</span>
+                                </h6>
+                                <p class="mb-1">{{ alert.message }}</p>
+                                <small class="text-muted">
+                                    <i class="fas fa-clock"></i> {{ alert.timestamp.strftime('%Y-%m-%d %H:%M') }}
+                                    {% if alert.related_entity %}
+                                    | <i class="fas fa-link"></i> {{ alert.related_entity }}
+                                    {% endif %}
+                                </small>
+                            </div>
+                            <div class="align-self-center">
+                                <a href="{{ alert.action_url }}" class="btn btn-sm btn-outline-dark">
+                                    Review
+                                </a>
+                            </div>
+                        </div>
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Key Statistics -->
+    <div class="row mb-4">
+        <div class="col-md-2">
+            <div class="card bg-primary text-white">
+                <div class="card-body text-center">
+                    <h3>{{ stats.total_inmates }}</h3>
+                    <small>Total Inmates</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card bg-success text-white">
+                <div class="card-body text-center">
+                    <h3>{{ stats.active_inmates }}</h3>
+                    <small>Active</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card bg-info text-white">
+                <div class="card-body text-center">
+                    <h3>{{ stats.today_visitors }}</h3>
+                    <small>Today's Visitors</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card bg-warning text-dark">
+                <div class="card-body text-center">
+                    <h3>{{ stats.capacity_percent }}%</h3>
+                    <small>Capacity Used</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card bg-danger text-white">
+                <div class="card-body text-center">
+                    <h3>{{ stats.high_risk_count }}</h3>
+                    <small>High Risk</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card bg-secondary text-white">
+                <div class="card-body text-center">
+                    <h3>{{ stats.pending_visits }}</h3>
+                    <small>Pending Visits</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Charts Row -->
+    <div class="row mb-4">
+        <!-- Population Trend -->
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-chart-line"></i> Population Trend (30 Days)</h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="populationChart" height="200"></canvas>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Visitor Anomalies -->
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-chart-bar"></i> Visitor Anomaly Trends</h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="anomalyChart" height="200"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Population Forecast & Risk Distribution -->
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header bg-dark text-white">
+                    <h5 class="mb-0"><i class="fas fa-crystal-ball"></i> Population Forecast</h5>
+                </div>
+                <div class="card-body">
+                    <div class="text-center mb-3">
+                        <h2 class="display-4">{{ forecast.predicted_population }}</h2>
+                        <p class="text-muted">Predicted in 30 days</p>
+                    </div>
+                    <table class="table table-sm">
+                        <tr>
+                            <th>Current Population:</th>
+                            <td>{{ forecast.current_population }}</td>
+                        </tr>
+                        <tr>
+                            <th>Capacity:</th>
+                            <td>{{ forecast.capacity }}</td>
+                        </tr>
+                        <tr>
+                            <th>Utilization:</th>
+                            <td>
+                                <div class="progress" style="height: 20px;">
+                                    <div class="progress-bar bg-{{ forecast.risk_color }}" 
+                                         style="width: {{ forecast.utilization_percent }}%">
+                                        {{ forecast.utilization_percent }}%
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                        <tr>
+                            <th>Overcrowding Risk:</th>
+                            <td>
+                                <span class="badge bg-{{ forecast.risk_color }}">
+                                    {{ forecast.overcrowding_risk }}
+                                </span>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-chart-pie"></i> Risk Distribution</h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="riskChart" height="200"></canvas>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-users"></i> Cell Block Occupancy</h5>
+                </div>
+                <div class="card-body" style="max-height: 250px; overflow-y: auto;">
+                    {% for block in cell_blocks %}
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between">
+                            <span>{{ block.name }}</span>
+                            <span>{{ block.current }}/{{ block.capacity }}</span>
+                        </div>
+                        <div class="progress" style="height: 15px;">
+                            <div class="progress-bar bg-{{ 'danger' if block.percent > 90 else 'warning' if block.percent > 75 else 'success' }}" 
+                                 style="width: {{ block.percent }}%">
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Incidents & Pending Actions -->
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header bg-warning text-dark">
+                    <h5 class="mb-0"><i class="fas fa-exclamation-circle"></i> Recent Incidents</h5>
+                </div>
+                <div class="card-body">
+                    {% if recent_incidents %}
+                    <div class="list-group list-group-flush">
+                        {% for incident in recent_incidents %}
+                        <div class="list-group-item">
+                            <div class="d-flex w-100 justify-content-between">
+                                <h6 class="mb-1">{{ incident.inmate_name }}</h6>
+                                <small>{{ incident.date }}</small>
+                            </div>
+                            <p class="mb-1">{{ incident.description }}</p>
+                            <small class="text-muted">{{ incident.action_taken }}</small>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <p class="text-muted text-center py-4">No recent incidents</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0"><i class="fas fa-tasks"></i> Pending Actions</h5>
+                </div>
+                <div class="card-body">
+                    {% if pending_actions %}
+                    <div class="list-group list-group-flush">
+                        {% for action in pending_actions %}
+                        <div class="list-group-item d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="mb-1">{{ action.title }}</h6>
+                                <small class="text-muted">{{ action.description }}</small>
+                            </div>
+                            <a href="{{ action.url }}" class="btn btn-sm btn-primary">Review</a>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <p class="text-muted text-center py-4">No pending actions</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+// Population Trend Chart
+const populationCtx = document.getElementById('populationChart').getContext('2d');
+new Chart(populationCtx, {
+    type: 'line',
+    data: {
+        labels: {{ population_trend.labels | tojson }},
+        datasets: [{
+            label: 'Population',
+            data: {{ population_trend.data | tojson }},
+            borderColor: 'rgb(75, 192, 192)',
+            tension: 0.1,
+            fill: false
+        }, {
+            label: 'Capacity',
+            data: {{ population_trend.capacity | tojson }},
+            borderColor: 'rgb(255, 99, 132)',
+            borderDash: [5, 5],
+            fill: false
+        }]
+    },
+    options: {
+        responsive: true,
+        plugins: {
+            legend: { position: 'bottom' }
+        },
+        scales: {
+            y: { beginAtZero: false }
+        }
+    }
+});
+
+// Anomaly Trends Chart
+const anomalyCtx = document.getElementById('anomalyChart').getContext('2d');
+new Chart(anomalyCtx, {
+    type: 'bar',
+    data: {
+        labels: {{ anomaly_trend.labels | tojson }},
+        datasets: [{
+            label: 'Flagged Visits',
+            data: {{ anomaly_trend.data | tojson }},
+            backgroundColor: 'rgba(255, 99, 132, 0.5)',
+            borderColor: 'rgb(255, 99, 132)',
+            borderWidth: 1
+        }]
+    },
+    options: {
+        responsive: true,
+        plugins: {
+            legend: { position: 'bottom' }
+        },
+        scales: {
+            y: { beginAtZero: true }
+        }
+    }
+});
+
+// Risk Distribution Chart
+const riskCtx = document.getElementById('riskChart').getContext('2d');
+new Chart(riskCtx, {
+    type: 'doughnut',
+    data: {
+        labels: ['Low', 'Medium', 'High', 'Critical'],
+        datasets: [{
+            data: {{ risk_distribution | tojson }},
+            backgroundColor: [
+                'rgba(40, 167, 69, 0.8)',
+                'rgba(255, 193, 7, 0.8)',
+                'rgba(253, 126, 20, 0.8)',
+                'rgba(220, 53, 69, 0.8)'
+            ]
+        }]
+    },
+    options: {
+        responsive: true,
+        plugins: {
+            legend: { position: 'bottom' }
+        }
+    }
+});
+
+function refreshAlerts() {
+    fetch('/api/ai/alerts')
+        .then(response => response.json())
+        .then(data => {
+            // Update alerts panel
+            location.reload();
+        });
+}
+
+// Auto-refresh alerts every 60 seconds
+setInterval(refreshAlerts, 60000);
+</script>
+{% endblock %}

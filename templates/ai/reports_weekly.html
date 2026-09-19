@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% block title %}Weekly Report — Luzira PMS{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3 d-print-none">
+    <h2 class="mb-0"><i class="bi bi-file-earmark-text"></i> Weekly Report</h2>
+    <div>
+        <button class="btn btn-primary" onclick="window.print()">
+            <i class="bi bi-printer"></i> Print / Save as PDF
+        </button>
+        <a href="{{ url_for('ai.dashboard') }}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> Back
+        </a>
+    </div>
+</div>
+
+<div class="card shadow-sm border-0">
+    <div class="card-body">
+        <div class="text-center mb-4">
+            <h3>Luzira Prison Management System</h3>
+            <p class="text-muted mb-0">
+                Weekly Summary: {{ week_ago }} → {{ today }}
+            </p>
+            <p class="text-muted small">
+                Generated {{ today }} · Universal Technology and Management University
+            </p>
+        </div>
+
+        <table class="table table-bordered">
+            <tbody>
+                <tr>
+                    <th style="width: 60%">New inmates admitted</th>
+                    <td class="text-end"><strong>{{ new_inmates }}</strong></td>
+                </tr>
+                <tr>
+                    <th>New visitors registered</th>
+                    <td class="text-end"><strong>{{ new_visitors }}</strong></td>
+                </tr>
+                <tr>
+                    <th>Total visits logged</th>
+                    <td class="text-end"><strong>{{ week_visits }}</strong></td>
+                </tr>
+                <tr>
+                    <th>Visitors flagged by AI</th>
+                    <td class="text-end"><strong>{{ flagged }}</strong></td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h5 class="mt-4">Inmate risk distribution</h5>
+        <table class="table table-bordered">
+            <thead>
+                <tr><th>Risk level</th><th class="text-end">Count</th></tr>
+            </thead>
+            <tbody>
+                {% for level, count in risk_counts.items() %}
+                <tr>
+                    <td>{{ level }}</td>
+                    <td class="text-end">{{ count }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <div class="text-muted small mt-4">
+            This report is generated from live system data. Use
+            <strong>Print → Save as PDF</strong> to archive.
+        </div>
+    </div>
+</div>
+
+<style media="print">
+    .d-print-none, nav, footer { display: none !important; }
+    body { background: white !important; }
+    .card { box-shadow: none !important; border: 1px solid #ccc !important; }
+</style>
+{% endblock %}

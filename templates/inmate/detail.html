@@ -1,0 +1,158 @@
+{% extends "inmate/_layout.html" %}
+{% block title %}{{ inmate.full_name }} — Luzira PMS{% endblock %}
+
+{% block inmate_content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h3 class="mb-0">
+        <i class="bi bi-person-badge"></i>
+        {{ inmate.full_name }}
+        <code class="text-muted fs-6">{{ inmate.inmate_number }}</code>
+    </h3>
+        <div class="d-flex gap-2">
+        <a href="{{ url_for('edit_requests.inmate_edit', inmate_id=inmate.inmate_id) }}"
+           class="btn btn-warning btn-sm">
+            <i class="bi bi-pencil-square"></i> Request Edit
+        </a>
+        <a href="{{ url_for('inmate.readmit', inmate_id=inmate.inmate_id) }}"
+           class="btn btn-success btn-sm">
+            <i class="bi bi-arrow-repeat"></i> Re-admit
+        </a>
+        <a href="{{ url_for('inmate.list_inmates') }}" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-arrow-left"></i> Back
+        </a>
+    </div>
+    
+</div>
+
+<div class="row g-3">
+    <div class="col-md-8">
+        <div class="card shadow-sm border-0 mb-3">
+            <div class="card-header bg-dark text-white">Personal</div>
+            <div class="card-body">
+                <dl class="row mb-0">
+                    <dt class="col-sm-4">Date of birth</dt><dd class="col-sm-8">{{ inmate.date_of_birth }}</dd>
+                    <dt class="col-sm-4">Gender</dt><dd class="col-sm-8">{{ inmate.gender }}</dd>
+                    <dt class="col-sm-4">Nationality</dt><dd class="col-sm-8">{{ inmate.nationality }}</dd>
+                    <dt class="col-sm-4">National ID</dt><dd class="col-sm-8">{{ inmate.national_id_number or '—' }}</dd>
+                    <dt class="col-sm-4">Next of kin</dt>
+                    <dd class="col-sm-8">
+                        {{ inmate.next_of_kin_name or '—' }}
+                        {% if inmate.next_of_kin_phone %}· {{ inmate.next_of_kin_phone }}{% endif %}
+                    </dd>
+                </dl>
+            </div>
+        </div>
+
+        <div class="card shadow-sm border-0 mb-3">
+            <div class="card-header bg-dark text-white">Legal</div>
+            <div class="card-body">
+                <dl class="row mb-0">
+                    <dt class="col-sm-4">Crime</dt><dd class="col-sm-8">{{ inmate.crime_category or '—' }}</dd>
+                    <dt class="col-sm-4">Description</dt><dd class="col-sm-8">{{ inmate.crime_description or '—' }}</dd>
+                    <dt class="col-sm-4">Court case №</dt><dd class="col-sm-8">{{ inmate.court_case_number or '—' }}</dd>
+                    <dt class="col-sm-4">Sentence</dt><dd class="col-sm-8">{{ inmate.sentence_type or '—' }}</dd>
+                    <dt class="col-sm-4">Expected release</dt><dd class="col-sm-8">{{ inmate.expected_release_date or '—' }}</dd>
+                </dl>
+            </div>
+        </div>
+
+        <div class="card shadow-sm border-0">
+            <div class="card-header bg-dark text-white">Admission History</div>
+            <div class="card-body p-0">
+                <table class="table table-sm mb-0">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Date</th>
+                            <th>Type</th>
+                            <th>Reason</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    {% for e in episodes %}
+                        <tr>
+                            <td>{{ loop.revindex }}</td>
+                            <td>{{ e.admission_date }}</td>
+                            <td>{{ e.admission_type }}</td>
+                            <td>{{ e.admission_reason or '—' }}</td>
+                            <td>
+                                {% if e.is_current %}
+                                    <span class="badge bg-success">Current</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">Closed</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% else %}
+                        <tr><td colspan="5" class="text-muted text-center py-3">No admissions logged.</td></tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="card shadow-sm border-0 mb-3">
+            <div class="card-body text-center">
+                <i class="bi bi-fingerprint {{ 'text-success' if inmate.biometric_enrolled else 'text-muted' }}"
+                   style="font-size: 4rem;"></i>
+                <h6 class="mt-2">
+                    {{ 'Fingerprint Enrolled' if inmate.biometric_enrolled else 'No Fingerprint' }}
+                </h6>
+                {% if inmate.biometric_enrolled %}
+                    <div class="small text-muted">
+                        Enrolled {{ inmate.biometric_enrollment_date.strftime('%Y-%m-%d') }}<br>
+                        Quality {{ inmate.biometric_quality_score }}
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="card shadow-sm border-0">
+            <div class="card-header bg-dark text-white">Status</div>
+            <div class="card-body">
+                <dl class="row mb-0">
+                    <dt class="col-6">Status</dt>
+                    <dd class="col-6"><span class="badge bg-success">{{ inmate.status }}</span></dd>
+                    <dt class="col-6">Cell</dt>
+                    <dd class="col-6">{{ inmate.cell_block or '—' }} / {{ inmate.cell_number or '—' }}</dd>
+                    <dt class="col-6">Total admissions</dt><dd class="col-6">{{ inmate.total_admissions }}</dd>
+                    <dt class="col-6">Security</dt><dd class="col-6">{{ inmate.security_classification }}</dd>
+                </dl>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% if pending_edits %}
+<div class="card shadow-sm border-0 mt-3 border-warning">
+    <div class="card-header bg-warning text-dark">
+        <i class="bi bi-hourglass-split"></i>
+        Pending Edit Requests ({{ pending_edits|length }})
+    </div>
+    <div class="card-body">
+        {% for r in pending_edits %}
+        <div class="border rounded p-2 mb-2">
+            <div class="d-flex justify-content-between">
+                <div>
+                    <strong>#{{ r.request_id }}</strong>
+                    — {{ r.change_count }} field(s) proposed
+                    by {{ r.requestor.full_name if r.requestor else '—' }}
+                </div>
+                <small class="text-muted">{{ r.requested_at.strftime('%Y-%m-%d %H:%M') }}</small>
+            </div>
+            {% if r.request_reason %}
+            <div class="small text-muted">Reason: {{ r.request_reason }}</div>
+            {% endif %}
+            {% if has_permission('inmate:edit_approve') %}
+            <a href="{{ url_for('edit_requests.view_request', request_id=r.request_id) }}"
+               class="btn btn-sm btn-warning mt-2">Review</a>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+{% endblock %}
