@@ -6,7 +6,8 @@ from models.base import BaseModel, TimestampMixin, SerializableMixin
 
 from models.user import Role, UserAccount
 from models.inmate import Inmate, AdmissionEpisode
-from models.visitor import Visitor, VisitLog
+from models.visitor import Visitor
+from models.visit import VisitLog
 from models.medical import MedicalRecord, DisciplinaryLog
 from models.ai import AIAnalysisLog, VisitorPattern, PopulationForecast
 from models.audit import AuditEvent

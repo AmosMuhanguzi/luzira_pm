@@ -3,6 +3,7 @@ import base64
 from flask import (Blueprint, render_template, redirect, url_for,
                    flash, request, session, current_app, jsonify)
 from flask_login import login_required, current_user
+from models import Visitor, VisitLog
 
 from extensions import csrf
 from services.rbac import require_permission, Permissions

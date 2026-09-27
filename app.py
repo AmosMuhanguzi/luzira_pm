@@ -1,5 +1,8 @@
-# app.py
 import os
+import importlib
+from flask import Flask
+from extensions import db  # or wherever your db instance is defined
+from flask_migrate import Migrate
 from flask import Flask, jsonify
 from config import config
 from extensions import db, login_manager, migrate, csrf, jwt
@@ -13,9 +16,11 @@ def create_app(config_name=None):
 
     os.makedirs(app.instance_path, exist_ok=True)
 
+    migrate = Migrate(app, db)
+
     # ---- Extensions ----
     db.init_app(app)
-    migrate.init_app(app, db)
+    migrate.init_app(app)
     login_manager.init_app(app)
     jwt.init_app(app)
     csrf.init_app(app)
@@ -29,12 +34,12 @@ def create_app(config_name=None):
             AuditEvent, Notification, SystemSetting,
         )
 
-    # ---- Flask-Login user loader ----
-    from models.user import UserAccount
-
-        # ---- AI scheduler ----
+    # ---- AI scheduler ----
     from services.ai_scheduler import init_scheduler
     init_scheduler(app)
+
+    # ---- Flask-Login user loader ----
+    from models.user import UserAccount
 
     @login_manager.user_loader
     def load_user(user_id):
@@ -43,8 +48,6 @@ def create_app(config_name=None):
     # ---- Register blueprints ----
     from routes.auth import auth_bp
     app.register_blueprint(auth_bp)
-
-
 
     from routes.admin import admin_bp          
     app.register_blueprint(admin_bp) 
@@ -58,11 +61,24 @@ def create_app(config_name=None):
     from routes.visitor import visitor_bp       
     app.register_blueprint(visitor_bp)  
 
-    from routes.ai import ai_bp                     
-    app.register_blueprint(ai_bp)                           
+    from routes.ai import ai_bp                    
+    app.register_blueprint(ai_bp)
 
+    # Additional required blueprints based on proposal scope
+    try:
+        receptionist_module = importlib.import_module('routes.receptionist')
+        receptionist_bp = receptionist_module.receptionist_bp
+        app.register_blueprint(receptionist_bp)
+    except ImportError:
+        pass
 
-        # ---- Jinja helpers ----
+    try:
+        from api_routes import api_bp
+        app.register_blueprint(api_bp)
+    except ImportError:
+        pass
+
+    # ---- Jinja helpers ----
     from services.rbac import has_permission, Permissions
     from services.edit_request_service import EditRequestService
 
@@ -70,11 +86,10 @@ def create_app(config_name=None):
     app.jinja_env.globals['Permissions'] = Permissions
     app.jinja_env.globals['pending_edit_count'] = EditRequestService.pending_count
 
-
     # ---- Health check ----
     @app.route('/health')
     def health():
-        return jsonify({'status': 'ok', 'facility': app.config['FACILITY_NAME']})
+        return jsonify({'status': 'ok', 'facility': app.config.get('FACILITY_NAME', 'Luzira Prison')})
 
     return app
 

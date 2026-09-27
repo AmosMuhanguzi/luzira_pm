@@ -7,7 +7,8 @@ import base64
 from datetime import date, datetime
 from sqlalchemy import or_, func
 from extensions import db
-from models.visitor import Visitor, VisitLog
+from models.visitor import Visitor
+from models.visit import VisitLog
 from models.inmate import Inmate
 from models.audit import AuditEvent
 
