@@ -191,3 +191,5 @@ def weekly_report():
                            new_inmates=new_inmates, new_visitors=new_visitors,
                            week_visits=week_visits, flagged=flagged,
                            risk_counts=risk_counts)
+
+

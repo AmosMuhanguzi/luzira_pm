@@ -140,12 +140,14 @@ def detail(visitor_id):
         flash('Visitor not found.', 'danger')
         return redirect(url_for('visitor.list_visitors'))
 
+    # Determine sorting column dynamically based on VisitLog attributes
+    order_col = getattr(VisitLog, 'check_in_time', getattr(VisitLog, 'created_at', VisitLog.visit_id))
+
     visits = visitor.visit_logs.order_by(
-        VisitLog.visit_date.desc(), VisitLog.visit_id.desc()
+        order_col.desc(), VisitLog.visit_id.desc()
     ).limit(30).all()
 
     return render_template('visitor/detail.html', visitor=visitor, visits=visits)
-
 
 # ---------- Check-in ----------
 @visitor_bp.route('/<int:visitor_id>/check-in', methods=['GET', 'POST'])

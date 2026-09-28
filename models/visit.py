@@ -55,6 +55,38 @@ class VisitLog(BaseModel):
         rem_mins = mins % 60
         return f"{hours}h {rem_mins}m" if rem_mins else f"{hours}h"
 
+
+    @property
+    def visit_date(self):
+        """Returns formatted date from check_in_time or created_at."""
+        dt = getattr(self, 'check_in_time', None) or getattr(self, 'created_at', None)
+        return dt.strftime('%Y-%m-%d') if dt else '—'
+
+    @property
+    def duration(self):
+        """Calculates duration between check_in_time and check_out_time."""
+        check_in = getattr(self, 'check_in_time', None)
+        check_out = getattr(self, 'check_out_time', None)
+        if check_in and check_out:
+            delta = check_out - check_in
+            hours, remainder = divmod(int(delta.total_seconds()), 3600)
+            minutes, _ = divmod(remainder, 60)
+            if hours > 0:
+                return f"{hours}h {minutes}m"
+            return f"{minutes}m"
+        elif check_in and not check_out:
+            return "Active"
+        return "—"
+
+    @property
+    def display_status(self):
+        """Returns standard status string."""
+        if getattr(self, 'check_out_time', None):
+            return "Completed"
+        elif getattr(self, 'check_in_time', None):
+            return "In Progress"
+        return getattr(self, 'status', 'Pending')
+
     def to_dict(self):
         return {
             'visit_id': self.visit_id,

@@ -2,325 +2,266 @@
 {% block title %}Dashboard — Luzira PMS{% endblock %}
 
 {% block content %}
-<div class="row mb-4">
-    <div class="col-12">
-        <h2 class="mb-1"><i class="bi bi-speedometer2"></i> Dashboard</h2>
-        <p class="text-muted mb-0">
-            Signed in as <strong>{{ current_user.full_name }}</strong>
-            &middot; Role: <span class="badge bg-primary">{{ role }}</span>
-        </p>
+<!-- Header Section -->
+<div class="row mb-3">
+    <div class="col-12 d-flex justify-content-between align-items-center">
+        <div>
+            <h2 class="mb-1"><i class="bi bi-speedometer2"></i> Dashboard</h2>
+            <p class="text-muted mb-0">
+                Signed in as <strong>{{ current_user.full_name }}</strong>
+                &middot; Role: <span class="badge bg-primary">{{ role }}</span>
+            </p>
+        </div>
     </div>
 </div>
 
-{# ============================================================== #}
-{#  SYSTEM ADMINISTRATOR                                          #}
-{# ============================================================== #}
-{% if role == 'System Administrator' %}
-<div class="row g-4">
+<!-- QUICK-ACTION BAR -->
+<div class="card shadow-sm border-0 mb-4 bg-light">
+    <div class="card-body py-2 d-flex flex-wrap align-items-center justify-content-between gap-2">
+        <span class="fw-bold text-secondary me-2"><i class="bi bi-lightning-charge-fill text-warning"></i> Quick Actions:</span>
+        <div class="d-flex flex-wrap gap-2">
+            {% if role == 'System Administrator' %}
+                <a href="{{ url_for('admin.users_list') }}" class="btn btn-sm btn-outline-primary"><i class="bi bi-people-fill"></i> Staff Users</a>
+                <a href="{{ url_for('admin.user_new') }}" class="btn btn-sm btn-outline-success"><i class="bi bi-person-plus-fill"></i> Add User</a>
+                <a href="{{ url_for('edit_requests.list_requests') }}" class="btn btn-sm btn-outline-danger position-relative">
+                    <i class="bi bi-inbox-fill"></i> Edit Requests
+                    {% set pc = pending_edit_count() if pending_edit_count is defined else 0 %}
+                    {% if pc > 0 %}
+                        <span class="badge rounded-pill bg-danger ms-1">{{ pc }}</span>
+                    {% endif %}
+                </a>
+                <a href="{{ url_for('inmate.intake_scan') }}" class="btn btn-sm btn-outline-warning"><i class="bi bi-fingerprint"></i> Intake</a>
+                <a href="{{ url_for('inmate.list_inmates') }}" class="btn btn-sm btn-outline-info"><i class="bi bi-person-vcard"></i> Inmates</a>
+                <a href="{{ url_for('visitor.scan') }}" class="btn btn-sm btn-outline-success"><i class="bi bi-person-check"></i> Visitors</a>
+                <a href="{{ url_for('ai.dashboard') }}" class="btn btn-sm btn-outline-dark"><i class="bi bi-robot"></i> AI Analytics</a>
 
-    <div class="col-md-6 col-lg-4">
-        <a href="{{ url_for('admin.users_list') }}" class="text-decoration-none">
-            <div class="card h-100 shadow-sm border-0 card-hover">
-                <div class="card-body">
-                    <i class="bi bi-people-fill fs-1 text-primary"></i>
-                    <h5 class="mt-3 text-dark">Staff Users</h5>
-                    <p class="text-muted small mb-0">
-                        Create, edit, reset passwords, and manage fingerprints for staff.
-                    </p>
-                </div>
-            </div>
-        </a>
+            {% elif role == 'Warden' %}
+                <a href="{{ url_for('inmate.list_inmates') }}" class="btn btn-sm btn-outline-primary"><i class="bi bi-person-vcard"></i> Inmate Records</a>
+                <a href="{{ url_for('edit_requests.my_requests') }}" class="btn btn-sm btn-outline-warning"><i class="bi bi-send-check"></i> My Requests</a>
+
+            {% elif role == 'Records Officer' %}
+                <a href="{{ url_for('inmate.list_inmates') }}" class="btn btn-sm btn-outline-primary"><i class="bi bi-person-vcard"></i> Inmate Records</a>
+                <a href="{{ url_for('edit_requests.my_requests') }}" class="btn btn-sm btn-outline-warning"><i class="bi bi-send-check"></i> My Requests</a>
+
+            {% elif role == 'Receptionist' %}
+                <a href="{{ url_for('inmate.intake_scan') }}" class="btn btn-sm btn-outline-warning"><i class="bi bi-fingerprint"></i> Intake</a>
+                <a href="{{ url_for('inmate.list_inmates') }}" class="btn btn-sm btn-outline-primary"><i class="bi bi-person-vcard"></i> Inmate Records</a>
+                <a href="{{ url_for('edit_requests.my_requests') }}" class="btn btn-sm btn-outline-info"><i class="bi bi-send-check"></i> My Requests</a>
+                <a href="{{ url_for('visitor.scan') }}" class="btn btn-sm btn-outline-success"><i class="bi bi-person-check"></i> Visitor Check-in</a>
+
+            {% elif role == 'Security Officer' %}
+                <a href="{{ url_for('edit_requests.my_requests') }}" class="btn btn-sm btn-outline-warning"><i class="bi bi-send-check"></i> My Requests</a>
+                <a href="{{ url_for('visitor.scan') }}" class="btn btn-sm btn-outline-success"><i class="bi bi-person-check"></i> Visitor Check-in</a>
+            {% endif %}
+        </div>
     </div>
+</div>
 
-    <div class="col-md-6 col-lg-4">
-        <a href="{{ url_for('admin.user_new') }}" class="text-decoration-none">
-            <div class="card h-100 shadow-sm border-0 card-hover">
-                <div class="card-body">
-                    <i class="bi bi-person-plus-fill fs-1 text-success"></i>
-                    <h5 class="mt-3 text-dark">Add New User</h5>
-                    <p class="text-muted small mb-0">
-                        Register a new staff member. They enrol a fingerprint on first login.
-                    </p>
-                </div>
-            </div>
-        </a>
-    </div>
-
-    <div class="col-md-6 col-lg-4">
-        <a href="{{ url_for('edit_requests.list_requests') }}" class="text-decoration-none">
-            <div class="card h-100 shadow-sm border-0 card-hover">
-                <div class="card-body">
-                    <i class="bi bi-inbox fs-1 text-danger"></i>
-                    <h5 class="mt-3 text-dark">
-                        Edit Requests
-                        {% set pc = pending_edit_count() %}
-                        {% if pc > 0 %}
-                        <span class="badge bg-danger">{{ pc }}</span>
-                        {% endif %}
-                    </h5>
-                    <p class="text-muted small mb-0">
-                        Review and approve changes requested by staff.
-                    </p>
-                </div>
-            </div>
-        </a>
-    </div>
-
-    <div class="col-md-6 col-lg-4">
-        <a href="{{ url_for('inmate.intake_scan') }}" class="text-decoration-none">
-            <div class="card h-100 shadow-sm border-0 card-hover">
-                <div class="card-body">
-                    <i class="bi bi-fingerprint fs-1 text-warning"></i>
-                    <h5 class="mt-3 text-dark">New Inmate Intake</h5>
-                    <p class="text-muted small mb-0">
-                        Scan fingerprint, run 1:N match, register or re-admit.
-                    </p>
-                </div>
-            </div>
-        </a>
-    </div>
-
-    <div class="col-md-6 col-lg-4">
-        <a href="{{ url_for('inmate.list_inmates') }}" class="text-decoration-none">
-            <div class="card h-100 shadow-sm border-0 card-hover">
-                <div class="card-body">
-                    <i class="bi bi-person-vcard fs-1 text-info"></i>
-                    <h5 class="mt-3 text-dark">Inmate Records</h5>
-                    <p class="text-muted small mb-0">
-                        View and manage all inmate records.
-                    </p>
-                </div>
-            </div>
-        </a>
-    </div>
-
-    <div class="col-md-6 col-lg-4">
-        <div class="card h-100 shadow-sm border-0 bg-light">
+<!-- REAL-TIME KPI METRICS BAR -->
+<div class="row g-3 mb-4">
+    <div class="col-md-3 col-sm-6">
+        <div class="card border-0 shadow-sm bg-primary text-white h-100">
             <div class="card-body">
-                <i class="bi bi-shield-lock-fill fs-1 text-secondary"></i>
-                <h5 class="mt-3">System Settings</h5>
-                <p class="text-muted small mb-0">Coming next.</p>
-                <span class="badge bg-secondary mt-2">Planned</span>
+                <div class="small opacity-75">Inmates (Now / Ever)</div>
+                <div class="fs-3 fw-bold">{{ total_inmates_now|default(0) }} <span class="fs-6 fw-normal">/ {{ total_inmates_ever|default(0) }}</span></div>
             </div>
         </div>
     </div>
-    <div class="col-md-6 col-lg-4">
-        <a href="{{ url_for('visitor.scan') }}" class="text-decoration-none">
-            <div class="card h-100 shadow-sm border-0 card-hover">
-                <div class="card-body">
-                    <i class="bi bi-fingerprint fs-1 text-success"></i>
-                    <h5 class="mt-3 text-dark">Visitor Check-in</h5>
-                    <p class="text-muted small mb-0">
-                        Scan visitor fingerprint and log visits.
-                    </p>
-                </div>
-            </div>
-        </a>
-    </div>
-        <div class="col-md-6 col-lg-4">
-        <a href="{{ url_for('ai.dashboard') }}" class="text-decoration-none">
-            <div class="card h-100 shadow-sm border-0 card-hover">
-                <div class="card-body">
-                    <i class="bi bi-robot fs-1 text-success"></i>
-                    <h5 class="mt-3 text-dark">AI Analytics</h5>
-                    <p class="text-muted small mb-0">
-                        Anomaly detection, population forecast, risk scoring.
-                    </p>
-                </div>
-            </div>
-        </a>
-    </div>
-
-</div>
-{% endif %}
-
-{# ============================================================== #}
-{#  WARDEN                                                        #}
-{# ============================================================== #}
-{% if role == 'Warden' %}
-<div class="row g-4">
-    <div class="col-md-6 col-lg-4">
-        <a href="{{ url_for('inmate.list_inmates') }}" class="text-decoration-none">
-            <div class="card h-100 shadow-sm border-0 card-hover">
-                <div class="card-body">
-                    <i class="bi bi-person-vcard fs-1 text-primary"></i>
-                    <h5 class="mt-3 text-dark">Inmate Records</h5>
-                    <p class="text-muted small mb-0">View all inmate records.</p>
-                </div>
-            </div>
-        </a>
-    </div>
-
-    <div class="col-md-6 col-lg-4">
-        <a href="{{ url_for('edit_requests.my_requests') }}" class="text-decoration-none">
-            <div class="card h-100 shadow-sm border-0 card-hover">
-                <div class="card-body">
-                    <i class="bi bi-send-check fs-1 text-warning"></i>
-                    <h5 class="mt-3 text-dark">My Edit Requests</h5>
-                    <p class="text-muted small mb-0">
-                        Track the status of changes you've submitted.
-                    </p>
-                </div>
-            </div>
-        </a>
-    </div>
-
-    <div class="col-md-6 col-lg-4">
-        <div class="card h-100 shadow-sm border-0 bg-light">
+    <div class="col-md-3 col-sm-6">
+        <div class="card border-0 shadow-sm bg-info text-white h-100">
             <div class="card-body">
-                <i class="bi bi-robot fs-1 text-secondary"></i>
-                <h5 class="mt-3">AI Analytics</h5>
-                <p class="text-muted small mb-0">Coming next.</p>
-                <span class="badge bg-secondary mt-2">Planned</span>
+                <div class="small opacity-75">Visitors (Today / Ever)</div>
+                <div class="fs-3 fw-bold">{{ total_daily_visits|default(0) }} <span class="fs-6 fw-normal">/ {{ total_visitors_ever|default(0) }}</span></div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 col-sm-6">
+        <div class="card border-0 shadow-sm bg-success text-white h-100">
+            <div class="card-body">
+                <div class="small opacity-75">Daily Intakes</div>
+                <div class="fs-3 fw-bold">{{ total_daily_intakes|default(0) }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 col-sm-6">
+        <div class="card border-0 shadow-sm bg-warning text-dark h-100">
+            <div class="card-body">
+                <div class="small opacity-75">Daily Releases</div>
+                <div class="fs-3 fw-bold">{{ total_daily_releases|default(0) }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 col-sm-6">
+        <div class="card border-0 shadow-sm bg-danger text-white h-100">
+            <div class="card-body">
+                <div class="small opacity-75">Inmate Deaths</div>
+                <div class="fs-3 fw-bold">{{ total_inmate_deaths|default(0) }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 col-sm-6">
+        <div class="card border-0 shadow-sm bg-secondary text-white h-100">
+            <div class="card-body">
+                <div class="small opacity-75">Total Occupancy</div>
+                <div class="fs-3 fw-bold">{{ total_occupied|default(0) }} / {{ total_capacity|default(0) }}</div>
+                <div class="progress mt-2" style="height: 6px;">
+                    <div class="progress-bar bg-white" style="width: {{ overall_capacity_pct|default(0) }}%;"></div>
+                </div>
             </div>
         </div>
     </div>
 </div>
-{% endif %}
 
-{# ============================================================== #}
-{#  RECORDS OFFICER                                               #}
-{# ============================================================== #}
-{% if role == 'Records Officer' %}
-<div class="row g-4">
-    <div class="col-md-6 col-lg-4">
-        <a href="{{ url_for('inmate.list_inmates') }}" class="text-decoration-none">
-            <div class="card h-100 shadow-sm border-0 card-hover">
-                <div class="card-body">
-                    <i class="bi bi-person-vcard fs-1 text-primary"></i>
-                    <h5 class="mt-3 text-dark">Inmate Records</h5>
-                    <p class="text-muted small mb-0">View, edit-request, and manage inmates.</p>
-                </div>
+<!-- GRAPH & CELL BLOCK MANAGEMENT MONITOR -->
+<div class="row g-4 mb-4">
+    <!-- Visual Trends Graph -->
+    <div class="col-lg-8">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-header bg-white fw-bold py-3"><i class="bi bi-graph-up text-primary"></i> Intake, Release & Visitor Trends</div>
+            <div class="card-body">
+                <canvas id="analyticsChart" height="130"></canvas>
             </div>
-        </a>
+        </div>
     </div>
 
-    <div class="col-md-6 col-lg-4">
-        <a href="{{ url_for('edit_requests.my_requests') }}" class="text-decoration-none">
-            <div class="card h-100 shadow-sm border-0 card-hover">
-                <div class="card-body">
-                    <i class="bi bi-send-check fs-1 text-warning"></i>
-                    <h5 class="mt-3 text-dark">My Edit Requests</h5>
-                    <p class="text-muted small mb-0">
-                        Track the status of changes you've submitted.
-                    </p>
-                </div>
+    <!-- Cell Blocks Capacity Bar View -->
+    <div class="col-lg-4">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center py-3">
+                <span class="fw-bold"><i class="bi bi-building text-secondary"></i> Cell Blocks</span>
+                <span class="badge bg-dark">{{ cell_blocks|length if cell_blocks else 0 }} Blocks</span>
             </div>
-        </a>
+            <div class="card-body overflow-auto" style="max-height: 380px;">
+                {% if cell_blocks %}
+                    {% for block in cell_blocks %}
+                        {% set current = block.current_occupancy if block.current_occupancy is defined else (block.inmates|length if block.inmates is defined else 0) %}
+                        {% set cap = block.capacity if block.capacity and block.capacity > 0 else 100 %}
+                        {% set pct = ((current / cap) * 100)|round(1) %}
+                        <div class="mb-3 p-2 rounded border cell-card position-relative shadow-sm" style="cursor: pointer; transition: transform 0.1s;" onclick="openCellModal('{{ block.id if block.id is defined else block.cell_id }}')">
+                            <div class="d-flex justify-content-between mb-1">
+                                <span class="fw-bold text-dark">{{ block.name }}</span>
+                                <small class="text-muted">{{ current }}/{{ cap }} ({{ (100 - pct)|round(1) }}% free)</small>
+                            </div>
+                            <div class="progress" style="height: 8px;">
+                                <div class="progress-bar {% if pct > 90 %}bg-danger{% elif pct > 75 %}bg-warning{% else %}bg-success{% endif %}" style="width: {{ pct }}%;"></div>
+                            </div>
+                        </div>
+                    {% endfor %}
+                {% else %}
+                    <p class="text-muted text-center py-4">No cell blocks configured.</p>
+                {% endif %}
+            </div>
+        </div>
     </div>
 </div>
-{% endif %}
 
-{# ============================================================== #}
-{#  RECEPTIONIST                                                  #}
-{# ============================================================== #}
-{% if role == 'Receptionist' %}
-<div class="row g-4">
-    <div class="col-md-6 col-lg-4">
-        <a href="{{ url_for('inmate.intake_scan') }}" class="text-decoration-none">
-            <div class="card h-100 shadow-sm border-0 card-hover">
-                <div class="card-body">
-                    <i class="bi bi-fingerprint fs-1 text-warning"></i>
-                    <h5 class="mt-3 text-dark">New Inmate Intake</h5>
-                    <p class="text-muted small mb-0">
-                        Scan fingerprint, run 1:N match, register or re-admit.
-                    </p>
-                </div>
-            </div>
-        </a>
-    </div>
-
-    <div class="col-md-6 col-lg-4">
-        <a href="{{ url_for('inmate.list_inmates') }}" class="text-decoration-none">
-            <div class="card h-100 shadow-sm border-0 card-hover">
-                <div class="card-body">
-                    <i class="bi bi-person-vcard fs-1 text-primary"></i>
-                    <h5 class="mt-3 text-dark">Inmate Records</h5>
-                    <p class="text-muted small mb-0">
-                        View inmate records. Request edits when corrections are needed.
-                    </p>
-                </div>
-            </div>
-        </a>
-    </div>
-
-    <div class="col-md-6 col-lg-4">
-        <a href="{{ url_for('edit_requests.my_requests') }}" class="text-decoration-none">
-            <div class="card h-100 shadow-sm border-0 card-hover">
-                <div class="card-body">
-                    <i class="bi bi-send-check fs-1 text-info"></i>
-                    <h5 class="mt-3 text-dark">My Edit Requests</h5>
-                    <p class="text-muted small mb-0">
-                        Track the status of changes you've submitted.
-                    </p>
-                </div>
-            </div>
-        </a>
-    </div>
-
-    <div class="col-md-6 col-lg-4">
-        <a href="{{ url_for('visitor.scan') }}" class="text-decoration-none">
-            <div class="card h-100 shadow-sm border-0 card-hover">
-                <div class="card-body">
-                    <i class="bi bi-fingerprint fs-1 text-success"></i>
-                    <h5 class="mt-3 text-dark">Visitor Check-in</h5>
-                    <p class="text-muted small mb-0">
-                        Scan visitor fingerprint and log visits.
-                    </p>
-                </div>
-            </div>
-        </a>
-    </div>
-        
-        </a>
-    </div>
-
-</div>
-{% endif %}
-
-{# ============================================================== #}
-{#  SECURITY OFFICER                                              #}
-{# ============================================================== #}
-{% if role == 'Security Officer' %}
-<div class="row g-4">
-    <div class="col-md-6 col-lg-4">
-        <a href="{{ url_for('edit_requests.my_requests') }}" class="text-decoration-none">
-            <div class="card h-100 shadow-sm border-0 card-hover">
-                <div class="card-body">
-                    <i class="bi bi-send-check fs-1 text-warning"></i>
-                    <h5 class="mt-3 text-dark">My Edit Requests</h5>
-                    <p class="text-muted small mb-0">
-                        Track the status of changes you've submitted.
-                    </p>
-                </div>
-            </div>
-        </a>
-    </div>
-
-        <div class="col-md-6 col-lg-4">
-        <a href="{{ url_for('visitor.scan') }}" class="text-decoration-none">
-            <div class="card h-100 shadow-sm border-0 card-hover">
-                <div class="card-body">
-                    <i class="bi bi-fingerprint fs-1 text-success"></i>
-                    <h5 class="mt-3 text-dark">Visitor Check-in</h5>
-                    <p class="text-muted small mb-0">
-                        Scan visitor fingerprint and log visits.
-                    </p>
-                </div>
-            </div>
-        </a>
-    </div>
-
-</div>
-{% endif %}
-
-{# ============================================================== #}
-{#  FALLBACK — unknown role                                       #}
-{# ============================================================== #}
 {% if role not in ['System Administrator','Warden','Records Officer','Receptionist','Security Officer'] %}
-<div class="alert alert-warning">
-    Your role (<strong>{{ role }}</strong>) has no dashboard cards configured yet.
+<div class="alert alert-warning shadow-sm">
+    Your role (<strong>{{ role }}</strong>) has no custom quick actions configured yet.
 </div>
 {% endif %}
 
+<!-- Dynamic Cell Inmates Modal -->
+<div class="modal fade" id="cellModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-light">
+                <h5 class="modal-title fw-bold" id="modalCellTitle">Cell Block Details</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="modalCapacityInfo" class="alert alert-info py-2 mb-3"></div>
+                
+                <!-- LIVE SEARCH FILTER INPUT -->
+                <div class="input-group mb-3 shadow-sm">
+                    <span class="input-group-text bg-white border-end-0"><i class="bi bi-search text-muted"></i></span>
+                    <input type="text" 
+                           id="modalInmateSearch" 
+                           class="form-control border-start-0" 
+                           placeholder="Type inmate number, name, or offense to filter..." 
+                           onkeyup="filterModalInmates()">
+                </div>
+
+                <div class="table-responsive" style="max-height: 420px; overflow-y: auto;">
+                    <table class="table table-hover align-middle mb-0" id="modalInmatesTable">
+                        <thead class="table-light sticky-top">
+                            <tr>
+                                <th>Inmate No.</th>
+                                <th>Full Name</th>
+                                <th>Offense</th>
+                                <th>Intake Date</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="cellInmatesList"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    // 1. Render Live Analytics Chart
+    const ctx = document.getElementById('analyticsChart').getContext('2d');
+    new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: {{ (chart_labels | default(['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'])) | tojson }},
+            datasets: [
+                { label: 'Intakes', data: {{ (chart_intakes | default([0, 0, 0, 0, 0, 0, 0])) | tojson }}, borderColor: '#198754', tension: 0.3, fill: false },
+                { label: 'Releases', data: {{ (chart_releases | default([0, 0, 0, 0, 0, 0, 0])) | tojson }}, borderColor: '#ffc107', tension: 0.3, fill: false },
+                { label: 'Visitors', data: {{ (chart_visitors | default([0, 0, 0, 0, 0, 0, 0])) | tojson }}, borderColor: '#0dcaf0', tension: 0.3, fill: false }
+            ]
+        },
+        options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
+    });
+
+    // 2. Fetch Cell Inmates via Endpoint on Click
+    // 2. Fetch Cell Inmates via Endpoint on Click
+    function openCellModal(cellId) {
+        // Clear previous search query whenever opening a cell block
+        const searchInput = document.getElementById('modalInmateSearch');
+        if (searchInput) searchInput.value = '';
+
+        fetch(`/api/cells/${cellId}/inmates`)
+            .then(res => res.json())
+            .then(data => {
+                document.getElementById('modalCellTitle').innerText = `Cell Block ${data.cell_name} — Inmate Roster`;
+                document.getElementById('modalCapacityInfo').innerText = `Occupancy: ${data.occupancy} / ${data.capacity} (${data.percentage}% full — ${(100 - data.percentage).toFixed(1)}% capacity remaining)`;
+
+                const tbody = document.getElementById('cellInmatesList');
+                tbody.innerHTML = data.inmates.map(i => `
+                    <tr>
+                        <td><a href="/inmate/${i.inmate_id}" class="fw-bold text-danger text-decoration-none">${i.inmate_number}</a></td>
+                        <td class="fw-bold">${i.full_name}</td>
+                        <td>${i.crime}</td>
+                        <td>${i.intake_date}</td>
+                        <td><a href="/inmate/${i.inmate_id}" class="btn btn-sm btn-outline-primary py-0">View</a></td>
+                    </tr>
+                `).join('') || '<tr><td colspan="5" class="text-center text-muted">No inmates currently assigned to this cell block.</td></tr>';
+
+                new bootstrap.Modal(document.getElementById('cellModal')).show();
+            })
+            .catch(err => console.error('Error fetching cell details:', err));
+    }
+    // 3. Instant Search Filter Logic for Modal Rows
+    function filterModalInmates() {
+        const input = document.getElementById('modalInmateSearch');
+        const filter = input.value.toLowerCase().trim();
+        const tbody = document.getElementById('cellInmatesList');
+        const rows = tbody.getElementsByTagName('tr');
+
+        for (let i = 0; i < rows.length; i++) {
+            const row = rows[i];
+            const textContent = row.textContent || row.innerText;
+            if (textContent.toLowerCase().indexOf(filter) > -1) {
+                row.style.display = '';
+            } else {
+                row.style.display = 'none';
+            }
+        }
+    }
+</script>
 {% endblock %}

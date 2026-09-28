@@ -93,6 +93,15 @@ class Inmate(BaseModel):
         'VisitLog', back_populates='inmate', lazy='dynamic'
     )
 
+
+    @staticmethod
+    def generate_number():
+        from datetime import datetime
+        year = datetime.now().year
+        last_entry = Inmate.query.order_by(Inmate.inmate_id.desc()).first()
+        next_id = (last_entry.inmate_id + 1) if last_entry else 1
+        return f"LZR-{year}-{next_id:06d}"
+
     def current_episode(self):
         return self.admission_episodes.filter_by(is_current=True).first()
 
@@ -136,6 +145,8 @@ class Inmate(BaseModel):
             'status': self.status
         }
 
+    
+
     def __repr__(self):
         return f'<Inmate {self.inmate_number} {self.full_name}>'
 
@@ -163,3 +174,6 @@ class AdmissionEpisode(BaseModel):
 
     def __repr__(self):
         return f'<Episode {self.episode_id} inmate={self.inmate_id} type={self.admission_type}>'
+
+
+

@@ -1,6 +1,6 @@
 import os
 import importlib
-from flask import Flask
+from flask import Flask, app
 from extensions import db  # or wherever your db instance is defined
 from flask_migrate import Migrate
 from flask import Flask, jsonify
@@ -63,6 +63,11 @@ def create_app(config_name=None):
 
     from routes.ai import ai_bp                    
     app.register_blueprint(ai_bp)
+
+
+    from routes.api import api_bp
+    # FIX: Add url_prefix='/api' here
+    app.register_blueprint(api_bp, url_prefix='/api')
 
     # Additional required blueprints based on proposal scope
     try:

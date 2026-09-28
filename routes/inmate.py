@@ -5,6 +5,7 @@ from flask import (Blueprint, render_template, redirect, url_for,
 from flask_login import login_required, current_user
 
 from extensions import csrf
+from models.cell import CellBlock
 from services.rbac import require_permission, Permissions
 from services.inmate_service import InmateService
 from services.inmate_matcher import InmateMatcher
@@ -195,3 +196,44 @@ def detail(inmate_id):
     return render_template('inmate/detail.html',
                            inmate=inmate, episodes=episodes,
                            pending_edits=pending_edits)
+
+@inmate_bp.route('/register', methods=['GET', 'POST'])
+def register_inmate():
+    if request.method == 'POST':
+        full_name = request.form.get('full_name')
+        offense = request.form.get('offense')
+        selected_cell_id = request.form.get('cell_id')  # Form dropdown value
+
+        # AUTO-ASSIGNMENT LOGIC (Equal Population Distribution)
+        if not selected_cell_id or selected_cell_id == 'auto':
+            # Select the block with lowest occupancy percentage or lowest count
+            all_blocks = CellBlock.query.all()
+            if all_blocks:
+                # Pick cell with lowest current_occupancy
+                chosen_cell = min(all_blocks, key=lambda b: (b.current_occupancy / b.capacity) if b.capacity > 0 else 0)
+                selected_cell_id = chosen_cell.id
+            else:
+                selected_cell_id = None
+
+        # Create Inmate Record
+        new_inmate = Inmate(
+            full_name=full_name,
+            crime=offense,
+            cell_id=selected_cell_id,
+            status='Active'
+        )
+        db.session.add(new_inmate)
+
+        # Update Cell Occupancy Counter
+        if selected_cell_id:
+            cell = CellBlock.query.get(selected_cell_id)
+            if cell:
+                cell.current_occupancy = (cell.current_occupancy or 0) + 1
+
+        db.session.commit()
+        flash('Inmate successfully registered and assigned!', 'success')
+        return redirect(url_for('inmate.list_inmates'))
+
+    # GET Request: Pass all cell blocks to form dropdown
+    cell_blocks = CellBlock.query.all()
+    return render_template('inmate_register.html', cell_blocks=cell_blocks)

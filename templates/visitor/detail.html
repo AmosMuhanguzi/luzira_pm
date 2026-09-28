@@ -6,7 +6,7 @@
     <h3 class="mb-0">
         <i class="bi bi-person-badge"></i>
         {{ visitor.full_name }}
-        <code class="text-muted fs-6">{{ visitor.visitor_number }}</code>
+        <code class="text-muted fs-6">{{ visitor.visitor_number or '' }}</code>
     </h3>
     <div class="d-flex gap-2">
         {% if not visitor.is_blacklisted %}
@@ -51,8 +51,8 @@
                 </h6>
                 {% if visitor.biometric_enrolled %}
                     <div class="small text-muted">
-                        Enrolled {{ visitor.biometric_enrollment_date.strftime('%Y-%m-%d') }}<br>
-                        Quality {{ visitor.biometric_quality_score }}
+                        Enrolled {{ visitor.biometric_enrollment_date.strftime('%Y-%m-%d') if visitor.biometric_enrollment_date else '—' }}<br>
+                        Quality {{ visitor.biometric_quality_score or 0 }}
                     </div>
                 {% endif %}
             </div>
@@ -79,10 +79,10 @@
         <div class="card shadow-sm border-0">
             <div class="card-header bg-dark text-white">
                 <i class="bi bi-clock-history"></i> Visit History
-                <span class="badge bg-secondary ms-2">{{ visitor.total_visits }} total</span>
+                <span class="badge bg-secondary ms-2">{{ visitor.total_visits or visits|length }} total</span>
             </div>
             <div class="table-responsive">
-                <table class="table table-sm mb-0">
+                <table class="table table-sm mb-0 align-middle">
                     <thead>
                         <tr>
                             <th>Date</th>
@@ -106,7 +106,7 @@
                                 </a>
                                 {% else %}—{% endif %}
                             </td>
-                            <td>{{ v.visit_type }}</td>
+                            <td>{{ v.visit_type or 'Regular' }}</td>
                             <td class="small">
                                 {{ v.check_in_time.strftime('%H:%M') if v.check_in_time else '—' }}
                             </td>
@@ -114,18 +114,24 @@
                                 {{ v.check_out_time.strftime('%H:%M') if v.check_out_time else '—' }}
                             </td>
                             <td class="small">
-                                {{ (v.visit_duration_minutes ~ ' min') if v.visit_duration_minutes else '—' }}
+                                {% if v.visit_duration_minutes %}
+                                    {{ v.visit_duration_minutes }} min
+                                {% elif v.check_in_time and not v.check_out_time %}
+                                    <span class="text-primary fw-bold">Active</span>
+                                {% else %}
+                                    —
+                                {% endif %}
                             </td>
                             <td>
-                                <span class="badge
-                                    {% if v.visit_status == 'Completed' %}bg-success
-                                    {% elif v.visit_status == 'Approved' %}bg-info
+                                <span class="badge 
+                                    {% if v.check_out_time or v.visit_status == 'Completed' %}bg-success
+                                    {% elif v.visit_status == 'Approved' or v.check_in_time %}bg-info text-dark
                                     {% else %}bg-secondary{% endif %}">
-                                    {{ v.visit_status }}
+                                    {% if v.check_out_time %}Completed{% elif v.check_in_time %}In Progress{% else %}{{ v.visit_status }}{% endif %}
                                 </span>
                             </td>
                             <td class="text-end">
-                                {% if not v.check_out_time and v.visit_status == 'Approved' %}
+                                {% if not v.check_out_time and (v.visit_status == 'Approved' or v.check_in_time) %}
                                 <form method="POST"
                                       action="{{ url_for('visitor.check_out', visit_id=v.visit_id) }}"
                                       class="d-inline">

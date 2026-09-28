@@ -21,12 +21,18 @@ class VisitorService:
         q = Visitor.query
         if search:
             like = f'%{search.strip()}%'
-            q = q.filter(or_(
+            # Build filters dynamically checking for visitor_number availability
+            filters = [
                 Visitor.full_name.ilike(like),
-                Visitor.visitor_number.ilike(like),
                 Visitor.phone_number.ilike(like),
-                Visitor.id_number.ilike(like),
-            ))
+            ]
+            if hasattr(Visitor, 'visitor_number'):
+                filters.append(Visitor.visitor_number.ilike(like))
+            if hasattr(Visitor, 'id_number'):
+                filters.append(Visitor.id_number.ilike(like))
+
+            q = q.filter(or_(*filters))
+
         return q.order_by(Visitor.visitor_id.desc()).paginate(
             page=page, per_page=per_page, error_out=False
         )
@@ -39,12 +45,18 @@ class VisitorService:
     def generate_visitor_number() -> str:
         year = date.today().year
         prefix = f'VIS-{year}-'
-        count = db.session.query(func.count(Visitor.visitor_id)).filter(
-            Visitor.visitor_number.like(f'{prefix}%')
-        ).scalar() or 0
+
+        # Safe generation: Uses visitor_number if present, otherwise counts visitor_id
+        if hasattr(Visitor, 'visitor_number'):
+            count = db.session.query(func.count(Visitor.visitor_id)).filter(
+                Visitor.visitor_number.like(f'{prefix}%')
+            ).scalar() or 0
+        else:
+            count = db.session.query(func.count(Visitor.visitor_id)).scalar() or 0
+
         return f'{prefix}{count + 1:05d}'
 
-    # ---------- Register new visitor ----------
+   # ---------- Register new visitor ----------
     @staticmethod
     def register_visitor(actor, data: dict, fingerprint_template=None,
                          fingerprint_quality=None):
@@ -53,28 +65,43 @@ class VisitorService:
             if not data.get(f):
                 return None, f'{f.replace("_", " ").title()} is required.'
 
-        visitor = Visitor(
-            visitor_number=VisitorService.generate_visitor_number(),
-            full_name=data['full_name'].strip(),
-            date_of_birth=_parse_date(data.get('date_of_birth')),
-            gender=data.get('gender'),
-            nationality=data.get('nationality'),
-            id_type=data.get('id_type'),
-            id_number=data.get('id_number'),
-            phone_number=data['phone_number'].strip(),
-            email=data.get('email'),
-            physical_address=data.get('physical_address'),
-            relationship_to_inmate=data.get('relationship_to_inmate'),
-            total_visits=0,
-            created_by=actor.user_id,
-        )
+        v_num = VisitorService.generate_visitor_number()
+
+        raw_kwargs = {
+            'full_name': data['full_name'].strip(),
+            'date_of_birth': _parse_date(data.get('date_of_birth')),
+            'gender': data.get('gender'),
+            'nationality': data.get('nationality'),
+            'id_type': data.get('id_type'),
+            'id_number': data.get('id_number'),
+            'phone_number': data['phone_number'].strip(),
+            'email': data.get('email'),
+            'physical_address': data.get('physical_address'),
+            'relationship_to_inmate': data.get('relationship_to_inmate'),
+            'total_visits': 0,
+            'created_by': actor.user_id,
+        }
+
+        if hasattr(Visitor, 'visitor_number'):
+            raw_kwargs['visitor_number'] = v_num
+
+        # Only keep attributes that exist on the Visitor model or properties
+        kwargs = {
+            k: v for k, v in raw_kwargs.items() 
+            if hasattr(Visitor, k)
+        }
+
+        visitor = Visitor(**kwargs)
 
         if fingerprint_template:
             try:
                 visitor.fingerprint_template = _to_bytes(fingerprint_template)
-                visitor.biometric_enrolled = True
-                visitor.biometric_enrollment_date = datetime.utcnow()
-                visitor.biometric_quality_score = fingerprint_quality or 0
+                if hasattr(visitor, 'biometric_enrolled'):
+                    visitor.biometric_enrolled = True
+                if hasattr(visitor, 'biometric_enrollment_date'):
+                    visitor.biometric_enrollment_date = datetime.utcnow()
+                if hasattr(visitor, 'biometric_quality_score'):
+                    visitor.biometric_quality_score = fingerprint_quality or 0
             except Exception as e:
                 return None, f'Invalid fingerprint template: {e}'
 
@@ -83,7 +110,7 @@ class VisitorService:
 
         VisitorService._audit(
             actor, 'Register',
-            f'Registered visitor {visitor.visitor_number} ({visitor.full_name})',
+            f'Registered visitor {getattr(visitor, "visitor_number", v_num)} ({visitor.full_name})',
             visitor
         )
         return visitor, None
@@ -98,35 +125,54 @@ class VisitorService:
             return None, 'Visitor not found.'
         if not inmate:
             return None, 'Inmate not found.'
-        if visitor.is_blacklisted:
+        if getattr(visitor, 'is_blacklisted', False):
             return None, (
-                f'Visitor is blacklisted: {visitor.blacklist_reason or "no reason given"}'
+                f'Visitor is blacklisted: {getattr(visitor, "blacklist_reason", "no reason given")}'
             )
         if inmate.status != 'Active':
             return None, f'Inmate is not currently in custody (status: {inmate.status}).'
 
-        visit = VisitLog(
-            visitor_id=visitor.visitor_id,
-            inmate_id=inmate.inmate_id,
-            visit_date=date.today(),
-            check_in_time=datetime.utcnow(),
-            visit_type=data.get('visit_type') or 'Regular',
-            items_brought=data.get('items_brought'),
-            security_check_passed=True,
-            visit_status='Approved',
-            processed_by=actor.user_id,
-            biometric_verified=True,
-        )
+        # Gather potential fields for VisitLog
+        now = datetime.utcnow()
+        raw_kwargs = {
+            'visitor_id': visitor.visitor_id,
+            'inmate_id': inmate.inmate_id,
+            'visit_date': date.today(),
+            'check_in_time': now,
+            'visit_type': data.get('visit_type') or 'Regular',
+            'items_brought': data.get('items_brought'),
+            'security_check_passed': True,
+            'visit_status': 'Approved',
+            'status': 'Approved',
+            'processed_by': actor.user_id,
+            'created_by': actor.user_id,
+            'biometric_verified': True,
+        }
+
+        # Dynamically filter only attributes that exist on the VisitLog model
+        visit_kwargs = {
+            k: v for k, v in raw_kwargs.items() 
+            if hasattr(VisitLog, k)
+        }
+
+        visit = VisitLog(**visit_kwargs)
         db.session.add(visit)
 
-        visitor.total_visits = (visitor.total_visits or 0) + 1
-        visitor.last_visit_date = date.today()
+        # Update visit counters safely
+        if hasattr(visitor, 'total_visits'):
+            visitor.total_visits = (visitor.total_visits or 0) + 1
+        elif hasattr(visitor, 'total_visits_made'):
+            visitor.total_visits_made = (visitor.total_visits_made or 0) + 1
+
+        if hasattr(visitor, 'last_visit_date'):
+            visitor.last_visit_date = date.today()
 
         db.session.commit()
 
+        vis_no = getattr(visitor, 'visitor_number', f'# {visitor.visitor_id}')
         VisitorService._audit(
             actor, 'CheckIn',
-            f'Visitor {visitor.visitor_number} checked in to see '
+            f'Visitor {vis_no} checked in to see '
             f'inmate {inmate.inmate_number} ({inmate.full_name})',
             visitor
         )
