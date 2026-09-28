@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 from extensions import db
 from models.base import BaseModel
 
@@ -86,6 +86,19 @@ class VisitLog(BaseModel):
         elif getattr(self, 'check_in_time', None):
             return "In Progress"
         return getattr(self, 'status', 'Pending')
+
+
+    @property
+    def visit_date(self):
+        return self.check_in_time.date() if self.check_in_time else None
+
+    @visit_date.setter
+    def visit_date(self, value):
+        # Set the underlying timestamp column
+        if isinstance(value, datetime):
+            self.check_in_time = value
+        elif isinstance(value, date):
+            self.check_in_time = datetime.combine(value, datetime.min.time())
 
     def to_dict(self):
         return {
