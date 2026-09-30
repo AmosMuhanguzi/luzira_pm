@@ -21,15 +21,17 @@ class VisitorService:
         q = Visitor.query
         if search:
             like = f'%{search.strip()}%'
-            # Build filters dynamically checking for visitor_number availability
+            # Build filters dynamically using actual database columns
             filters = [
                 Visitor.full_name.ilike(like),
                 Visitor.phone_number.ilike(like),
             ]
             if hasattr(Visitor, 'visitor_number'):
                 filters.append(Visitor.visitor_number.ilike(like))
-            if hasattr(Visitor, 'id_number'):
-                filters.append(Visitor.id_number.ilike(like))
+            if hasattr(Visitor, 'national_id_number'):
+                filters.append(Visitor.national_id_number.ilike(like))
+            if hasattr(Visitor, 'passport_number'):
+                filters.append(Visitor.passport_number.ilike(like))
 
             q = q.filter(or_(*filters))
 
@@ -56,10 +58,10 @@ class VisitorService:
 
         return f'{prefix}{count + 1:05d}'
 
-   # ---------- Register new visitor ----------
+    # ---------- Register new visitor ----------
     @staticmethod
     def register_visitor(actor, data: dict, fingerprint_template=None,
-                         fingerprint_quality=None):
+                          fingerprint_quality=None):
         required = ['full_name', 'phone_number', 'relationship_to_inmate']
         for f in required:
             if not data.get(f):
@@ -132,12 +134,11 @@ class VisitorService:
         if inmate.status != 'Active':
             return None, f'Inmate is not currently in custody (status: {inmate.status}).'
 
-        # Gather potential fields for VisitLog
+        # Gather potential fields for VisitLog using check_in_time column
         now = datetime.utcnow()
         raw_kwargs = {
             'visitor_id': visitor.visitor_id,
             'inmate_id': inmate.inmate_id,
-            'visit_date': date.today(),
             'check_in_time': now,
             'visit_type': data.get('visit_type') or 'Regular',
             'items_brought': data.get('items_brought'),

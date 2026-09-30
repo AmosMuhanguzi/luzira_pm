@@ -99,6 +99,26 @@ class Visitor(BaseModel):
             'total_visits_made': self.total_visits_made,
             'anomaly_flag': self.anomaly_flag
         }
+    @property
+    def formatted_duration(self):
+        # 1. Grab stored duration or calculate dynamically if missing
+        mins = self.visit_duration_minutes
+        if mins is None and self.check_in_time and self.check_out_time:
+            delta = self.check_out_time - self.check_in_time
+            mins = max(0, int(delta.total_seconds() // 60))
+
+        if mins is None:
+            return "—"
+
+        # 2. Format into clean text (e.g., "18 mins", "1 hr 15 mins")
+        if mins < 60:
+            return f"{mins} min{'s' if mins != 1 else ''}"
+
+        hours = mins // 60
+        remaining_mins = mins % 60
+        if remaining_mins == 0:
+            return f"{hours} hr{'s' if hours != 1 else ''}"
+        return f"{hours} hr {remaining_mins} min{'s' if remaining_mins != 1 else ''}"
 
     def __repr__(self):
         return f'<Visitor {self.visitor_number or self.full_name} ({self.national_id_number or "No NIN"})>'

@@ -119,7 +119,7 @@
                                 {% elif v.check_in_time and not v.check_out_time %}
                                     <span class="text-primary fw-bold">Active</span>
                                 {% else %}
-                                    —
+                                    {{ v.formatted_duration }}
                                 {% endif %}
                             </td>
                             <td>
