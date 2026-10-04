@@ -9,14 +9,10 @@ def get_cell_inmates(cell_id):
     # Retrieve the selected CellBlock object by primary key
     cell = CellBlock.query.get_or_404(cell_id)
 
-    inactive_statuses = ['Released', 'Transferred', 'Deceased']
-
     inmates = Inmate.query.filter(
         Inmate.cell_block == cell.name,
-        ~Inmate.status.in_(inactive_statuses)
-    ).all()
-
-    
+        Inmate.status == 'Active',
+    ).order_by(Inmate.full_name.asc()).all()
 
     # Calculate occupancy stats
     occupancy = len(inmates)

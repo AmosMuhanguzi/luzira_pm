@@ -17,6 +17,7 @@ class Visitor(BaseModel):
     gender             = db.Column(db.String(10))
     date_of_birth      = db.Column(db.Date)
     phone_number       = db.Column(db.String(20), nullable=False, index=True)
+    email              = db.Column(db.String(255))
     address            = db.Column(db.Text)
     nationality        = db.Column(db.String(50), default='Ugandan')
     relationship_type  = db.Column(db.String(50))
@@ -90,6 +91,7 @@ class Visitor(BaseModel):
             'national_id_number': self.national_id_number,
             'passport_number': self.passport_number,
             'phone_number': self.phone_number,
+            'email': self.email,
             'gender': self.gender,
             'address': self.address,
             'relationship_type': self.relationship_type,

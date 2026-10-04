@@ -14,6 +14,7 @@ class Permissions:
     INMATE_CREATE            = 'inmate:create'
     INMATE_EDIT              = 'inmate:edit'
     INMATE_DELETE            = 'inmate:delete'
+    INMATE_RELEASE           = 'inmate:release'
     INMATE_BIOMETRIC_ENROLL  = 'inmate:biometric_enroll'
     INMATE_BIOMETRIC_VERIFY  = 'inmate:biometric_verify'
 
@@ -64,7 +65,8 @@ class Permissions:
 ROLE_PERMISSIONS = {
     'System Administrator': [
         Permissions.INMATE_VIEW, Permissions.INMATE_CREATE, Permissions.INMATE_EDIT,
-        Permissions.INMATE_DELETE, Permissions.INMATE_BIOMETRIC_ENROLL, Permissions.INMATE_BIOMETRIC_VERIFY,
+        Permissions.INMATE_DELETE, Permissions.INMATE_RELEASE,
+        Permissions.INMATE_BIOMETRIC_ENROLL, Permissions.INMATE_BIOMETRIC_VERIFY,
         Permissions.VISITOR_VIEW, Permissions.VISITOR_CREATE, Permissions.VISITOR_EDIT,
         Permissions.VISITOR_BLACKLIST, Permissions.VISITOR_BIOMETRIC_ENROLL, Permissions.VISITOR_BIOMETRIC_VERIFY,
         Permissions.VISIT_VIEW, Permissions.VISIT_CREATE, Permissions.VISIT_APPROVE, Permissions.VISIT_DENY,
@@ -78,6 +80,7 @@ ROLE_PERMISSIONS = {
     ],
     'Warden': [
         Permissions.INMATE_VIEW,
+        Permissions.INMATE_RELEASE,
         Permissions.VISITOR_VIEW,
         Permissions.VISIT_VIEW, Permissions.VISIT_APPROVE, Permissions.VISIT_DENY,
         Permissions.AI_VIEW_ALERTS, Permissions.AI_REVIEW_ALERTS, Permissions.AI_VIEW_DASHBOARD,
@@ -86,6 +89,7 @@ ROLE_PERMISSIONS = {
     ],
     'Records Officer': [
         Permissions.INMATE_VIEW, Permissions.INMATE_CREATE, Permissions.INMATE_EDIT,
+        Permissions.INMATE_RELEASE,
         Permissions.VISITOR_VIEW,
         Permissions.VISIT_VIEW,
         Permissions.REPORT_VIEW, Permissions.REPORT_GENERATE,
@@ -93,6 +97,7 @@ ROLE_PERMISSIONS = {
     ],
     'Receptionist': [
         Permissions.INMATE_VIEW, Permissions.INMATE_CREATE,
+        Permissions.INMATE_RELEASE,
         Permissions.INMATE_BIOMETRIC_ENROLL, Permissions.INMATE_BIOMETRIC_VERIFY,
         Permissions.VISITOR_VIEW, Permissions.VISITOR_CREATE, Permissions.VISITOR_EDIT,
         Permissions.VISITOR_BIOMETRIC_ENROLL, Permissions.VISITOR_BIOMETRIC_VERIFY,

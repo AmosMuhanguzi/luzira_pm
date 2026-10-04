@@ -59,6 +59,16 @@
                     <i class="bi bi-arrow-right-circle"></i>
                     <span id="proceedLabel">Proceed</span>
                 </a>
+                {% if mock_mode and has_permission(Permissions.INMATE_CREATE) %}
+                <a id="newPersonBtn" href="{{ url_for('inmate.new_intake') }}"
+                   class="btn btn-outline-warning" style="display:none;">
+                    <i class="bi bi-person-plus"></i> Register as a new inmate instead
+                </a>
+                <p id="mockMatchNote" class="small text-muted mb-0" style="display:none;">
+                    Simulation uses a shared sample fingerprint, so matches are not reliable.
+                    Use this option when testing a new inmate.
+                </p>
+                {% endif %}
                 <button id="rescanBtn" class="btn btn-outline-secondary">
                     <i class="bi bi-arrow-clockwise"></i> Scan Again
                 </button>
@@ -79,6 +89,8 @@ const scanIcon     = document.getElementById('scanIcon');
 const scanProgress = document.getElementById('scanProgress');
 const scanPanel    = document.getElementById('scanPanel');
 const resultPanel  = document.getElementById('resultPanel');
+const newPersonBtn = document.getElementById('newPersonBtn');
+const mockMatchNote = document.getElementById('mockMatchNote');
 
 scanBtn.addEventListener('click', doScan);
 document.getElementById('rescanBtn').addEventListener('click', () => {
@@ -135,6 +147,8 @@ function showResult(data) {
         document.getElementById('mScore').textContent      = data.score + '%';
         proceed.href = data.redirect;
         proceedLabel.textContent = 'Proceed with Re-admission';
+        if (newPersonBtn) newPersonBtn.style.display = 'inline-block';
+        if (mockMatchNote) mockMatchNote.style.display = 'block';
     } else {
         icon.innerHTML = '<i class="bi bi-person-plus-fill text-warning" style="font-size:6rem;"></i>';
         title.textContent = 'No Match — New Inmate';
@@ -142,6 +156,8 @@ function showResult(data) {
         matchedCard.style.display = 'none';
         proceed.href = data.redirect;
         proceedLabel.textContent = 'Register New Inmate';
+        if (newPersonBtn) newPersonBtn.style.display = 'none';
+        if (mockMatchNote) mockMatchNote.style.display = 'none';
     }
 }
 

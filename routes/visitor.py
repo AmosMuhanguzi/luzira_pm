@@ -3,6 +3,7 @@ import base64
 from flask import (Blueprint, render_template, redirect, url_for,
                    flash, request, session, current_app, jsonify)
 from flask_login import login_required, current_user
+from sqlalchemy import or_
 from models import Visitor, VisitLog
 
 from extensions import csrf
@@ -167,7 +168,7 @@ def check_in(visitor_id):
     if request.method == 'POST':
         inmate_id = request.form.get('inmate_id', type=int)
         if not inmate_id:
-            flash('Please select an inmate to visit.', 'warning')
+            flash('Please search for and select an inmate to visit.', 'warning')
         else:
             visit, error = VisitorService.check_in(
                 actor=current_user,
@@ -180,10 +181,40 @@ def check_in(visitor_id):
             else:
                 return redirect(url_for('visitor.visit_success', visit_id=visit.visit_id))
 
-    # Look up inmates we may let them visit
-    inmates = Inmate.query.filter_by(status='Active').order_by(Inmate.full_name).all()
     return render_template('visitor/select_inmate.html',
-                           visitor=visitor, inmates=inmates)
+                           visitor=visitor)
+
+
+@visitor_bp.route('/api/inmate-search')
+@login_required
+@require_permission(Permissions.VISIT_CREATE)
+def api_inmate_search():
+    query = request.args.get('q', '').strip()
+    if len(query) < 2:
+        return jsonify({'results': []})
+
+    pattern = f'%{query}%'
+    matches = Inmate.query.filter(
+        Inmate.status == 'Active',
+        or_(
+            Inmate.full_name.ilike(pattern),
+            Inmate.inmate_number.ilike(pattern),
+            Inmate.national_id_number.ilike(pattern),
+            Inmate.passport_number.ilike(pattern),
+            Inmate.court_case_number.ilike(pattern),
+            Inmate.alias_names.ilike(pattern),
+        ),
+    ).order_by(Inmate.full_name.asc()).limit(20).all()
+
+    return jsonify({
+        'results': [{
+            'inmate_id': inmate.inmate_id,
+            'inmate_number': inmate.inmate_number,
+            'full_name': inmate.full_name,
+            'national_id_number': inmate.national_id_number,
+            'cell_block': inmate.cell_block,
+        } for inmate in matches],
+    })
 
 
 # ---------- Visit success ----------

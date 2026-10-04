@@ -13,6 +13,7 @@
 <div class="alert alert-info">
     <strong>{{ visitor.full_name }}</strong> ({{ visitor.visitor_number }})
     · Phone {{ visitor.phone_number }}
+    · Email {{ visitor.email or 'Not provided' }}
     · Visits so far: {{ visitor.total_visits }}
     {% if visitor.anomaly_flag %}
         <span class="badge bg-warning text-dark ms-2">
@@ -27,27 +28,17 @@
             <i class="bi bi-person-vcard"></i> Which inmate is being visited?
         </div>
         <div class="card-body">
-            {% if inmates %}
             <div class="mb-3">
-                <label class="form-label">Select inmate *</label>
-                <select name="inmate_id" class="form-select" required>
-                    <option value="">-- choose --</option>
-                    {% for i in inmates %}
-                    <option value="{{ i.inmate_id }}">
-                        {{ i.inmate_number }} — {{ i.full_name }}
-                        ({{ i.cell_block or 'no cell' }})
-                    </option>
-                    {% endfor %}
-                </select>
-                <div class="form-text">
-                    Only active inmates are shown.
+                <label for="inmateSearch" class="form-label">Search inmate by name, inmate number, national ID, passport, case number, or alias *</label>
+                <input id="inmateSearch" class="form-control" type="search"
+                       autocomplete="off" placeholder="Type at least 2 characters…">
+                <input type="hidden" name="inmate_id" id="inmateId">
+                <div id="searchStatus" class="form-text" role="status" aria-live="polite">
+                    Only active inmates are available for visits.
                 </div>
+                <div id="searchResults" class="list-group mt-2" role="listbox"></div>
+                <div id="selectedInmate" class="alert alert-success mt-3 mb-0" hidden></div>
             </div>
-            {% else %}
-            <div class="alert alert-warning mb-0">
-                No active inmates in the facility. Register an inmate first.
-            </div>
-            {% endif %}
         </div>
     </div>
 
@@ -77,9 +68,99 @@
     <div class="d-flex justify-content-end gap-2 mb-4">
         <a href="{{ url_for('visitor.detail', visitor_id=visitor.visitor_id) }}"
            class="btn btn-outline-secondary">Cancel</a>
-        <button type="submit" class="btn btn-success btn-lg" {{ 'disabled' if not inmates }}>
+        <button type="submit" class="btn btn-success btn-lg">
             <i class="bi bi-check2-circle"></i> Confirm Check-in
         </button>
     </div>
 </form>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+const searchUrl = {{ url_for('visitor.api_inmate_search')|tojson }};
+const searchInput = document.getElementById('inmateSearch');
+const inmateId = document.getElementById('inmateId');
+const searchStatus = document.getElementById('searchStatus');
+const searchResults = document.getElementById('searchResults');
+const selectedInmate = document.getElementById('selectedInmate');
+const checkInForm = document.querySelector('form');
+let searchTimer;
+let searchController;
+
+searchInput.addEventListener('input', () => {
+    clearTimeout(searchTimer);
+    if (searchController) searchController.abort();
+    inmateId.value = '';
+    selectedInmate.hidden = true;
+    selectedInmate.textContent = '';
+    searchResults.replaceChildren();
+
+    const query = searchInput.value.trim();
+    if (query.length < 2) {
+        searchStatus.textContent = 'Type at least 2 characters to search active inmates.';
+        return;
+    }
+    searchStatus.textContent = 'Searching active inmates…';
+    searchTimer = setTimeout(() => searchInmates(query), 250);
+});
+
+async function searchInmates(query) {
+    searchController = new AbortController();
+    try {
+        const response = await fetch(`${searchUrl}?q=${encodeURIComponent(query)}`, {
+            signal: searchController.signal
+        });
+        if (!response.ok) throw new Error('Could not search inmate records.');
+        const data = await response.json();
+        if (searchInput.value.trim() !== query) return;
+
+        searchResults.replaceChildren();
+        if (!data.results.length) {
+            searchStatus.textContent = 'No active inmates match that search.';
+            return;
+        }
+
+        data.results.forEach(inmate => {
+            const option = document.createElement('button');
+            option.type = 'button';
+            option.className = 'list-group-item list-group-item-action';
+            option.setAttribute('role', 'option');
+
+            const title = document.createElement('strong');
+            title.textContent = `${inmate.inmate_number} — ${inmate.full_name}`;
+            const details = document.createElement('div');
+            details.className = 'small text-muted';
+            const detailParts = [];
+            if (inmate.national_id_number) detailParts.push(`National ID: ${inmate.national_id_number}`);
+            if (inmate.cell_block) detailParts.push(`Cell: ${inmate.cell_block}`);
+            details.textContent = detailParts.join(' · ');
+            option.append(title, details);
+
+            option.addEventListener('click', () => {
+                inmateId.value = inmate.inmate_id;
+                searchInput.value = `${inmate.inmate_number} — ${inmate.full_name}`;
+                searchStatus.textContent = 'Inmate selected.';
+                selectedInmate.textContent = `Selected: ${inmate.inmate_number} — ${inmate.full_name}`;
+                selectedInmate.hidden = false;
+                searchResults.replaceChildren();
+            });
+            searchResults.append(option);
+        });
+        searchStatus.textContent = `${data.results.length} matching active inmate${data.results.length === 1 ? '' : 's'} found.`;
+    } catch (error) {
+        if (error.name !== 'AbortError') {
+            searchStatus.textContent = error.message;
+        }
+    }
+}
+
+checkInForm.addEventListener('submit', event => {
+    if (!inmateId.value) {
+        event.preventDefault();
+        searchStatus.textContent = 'Select an inmate from the search results before checking in.';
+        searchInput.focus();
+    }
+});
+</script>
 {% endblock %}

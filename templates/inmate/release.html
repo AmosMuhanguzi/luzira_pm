@@ -1,0 +1,388 @@
+{% extends "base.html" %}
+{% block title %}Release Inmate — Luzira PMS{% endblock %}
+
+{% block content %}
+<div class="container-lg release-workflow">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="mb-1"><i class="bi bi-box-arrow-right text-warning"></i> Inmate Discharge</h2>
+            <p class="text-muted mb-0">Find the inmate, review their history, then confirm identity and record discharge.</p>
+        </div>
+        <a href="{{ url_for('auth.dashboard') }}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> Dashboard
+        </a>
+    </div>
+
+    <div class="card border-0 shadow-sm mb-4">
+        <div class="card-header bg-white py-3">
+            <h5 class="mb-0"><span class="badge bg-primary me-2">1</span> Find active inmate</h5>
+        </div>
+        <div class="card-body">
+            <label for="inmateSearch" class="form-label fw-semibold">Search by name, inmate number, national ID, alias, or case number</label>
+            <input id="inmateSearch" class="form-control form-control-lg" type="search"
+                   autocomplete="off" placeholder="Type at least 2 characters…">
+            <div id="searchStatus" class="form-text">Only active inmates are available for discharge.</div>
+            <div id="searchResults" class="list-group mt-2" role="listbox"></div>
+        </div>
+    </div>
+
+    <section id="historySection" class="card border-0 shadow-sm mb-4" hidden>
+        <div class="card-header bg-white py-3">
+            <h5 class="mb-0"><span class="badge bg-info me-2">2</span> Inmate record and history</h5>
+        </div>
+        <div class="card-body">
+            <div id="inmateSummary" class="row g-3 mb-3"></div>
+            <div class="accordion" id="historyAccordion">
+                <div class="accordion-item">
+                    <h2 class="accordion-header">
+                        <button class="accordion-button" type="button" data-bs-toggle="collapse"
+                                data-bs-target="#admissionHistory">Admission and release history</button>
+                    </h2>
+                    <div id="admissionHistory" class="accordion-collapse collapse show"
+                         data-bs-parent="#historyAccordion">
+                        <div class="accordion-body" id="admissionHistoryBody"></div>
+                    </div>
+                </div>
+                <div class="accordion-item">
+                    <h2 class="accordion-header">
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"
+                                data-bs-target="#medicalHistory">Medical history</button>
+                    </h2>
+                    <div id="medicalHistory" class="accordion-collapse collapse"
+                         data-bs-parent="#historyAccordion">
+                        <div class="accordion-body" id="medicalHistoryBody"></div>
+                    </div>
+                </div>
+                <div class="accordion-item">
+                    <h2 class="accordion-header">
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"
+                                data-bs-target="#disciplinaryHistory">Disciplinary history</button>
+                    </h2>
+                    <div id="disciplinaryHistory" class="accordion-collapse collapse"
+                         data-bs-parent="#historyAccordion">
+                        <div class="accordion-body" id="disciplinaryHistoryBody"></div>
+                    </div>
+                </div>
+                <div class="accordion-item">
+                    <h2 class="accordion-header">
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"
+                                data-bs-target="#auditHistory">Other recorded activity</button>
+                    </h2>
+                    <div id="auditHistory" class="accordion-collapse collapse"
+                         data-bs-parent="#historyAccordion">
+                        <div class="accordion-body" id="auditHistoryBody"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <div id="biometricSection" class="card border-0 shadow-sm mb-4" hidden>
+        <div class="card-header bg-white py-3">
+            <h5 class="mb-0"><span class="badge bg-warning text-dark me-2">3</span> Confirm inmate identity</h5>
+        </div>
+        <div class="card-body text-center">
+            <i class="bi bi-fingerprint text-primary" style="font-size:3.5rem;"></i>
+            <p id="biometricMessage" class="text-muted mt-2 mb-3">
+                Scan the selected inmate’s enrolled fingerprint. Release confirmation is disabled until it matches.
+            </p>
+            <button id="scanFingerprintBtn" type="button" class="btn btn-primary">
+                <i class="bi bi-fingerprint"></i> Scan fingerprint
+            </button>
+            <div id="biometricResult" class="mt-3" role="status" aria-live="polite"></div>
+        </div>
+    </div>
+
+    <section id="releaseSection" class="card border-0 shadow-sm mb-4" hidden>
+        <div class="card-header bg-white py-3">
+            <h5 class="mb-0"><span class="badge bg-success me-2">4</span> Discharge form</h5>
+        </div>
+        <div class="card-body p-4">
+            <div class="alert alert-light border">
+                Discharge date and local time (East Africa Time) are captured automatically when you submit.
+            </div>
+            <form method="POST" id="releaseForm" novalidate>
+                {{ form.hidden_tag() }}
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        {{ form.release_type.label(class="form-label fw-semibold") }}
+                        {{ form.release_type(class="form-select" + (" is-invalid" if form.release_type.errors else "")) }}
+                        {% for error in form.release_type.errors %}
+                        <div class="invalid-feedback">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+                    <div class="col-md-6">
+                        {{ form.release_cash_amount.label(class="form-label fw-semibold") }}
+                        <div class="input-group">
+                            <span class="input-group-text">UGX</span>
+                            {{ form.release_cash_amount(class="form-control" + (" is-invalid" if form.release_cash_amount.errors else ""), min="0", step="0.01", inputmode="decimal") }}
+                            {% for error in form.release_cash_amount.errors %}
+                            <div class="invalid-feedback">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+                        <div class="form-text">Cash or savings handed back to the inmate.</div>
+                    </div>
+                    <div class="col-12">
+                        {{ form.release_property_claims.label(class="form-label fw-semibold") }}
+                        {{ form.release_property_claims(class="form-control" + (" is-invalid" if form.release_property_claims.errors else ""), rows="3", placeholder="List property returned, outstanding claims, or write “None”.") }}
+                        {% for error in form.release_property_claims.errors %}
+                        <div class="invalid-feedback">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+                    <div class="col-12">
+                        {{ form.release_notes.label(class="form-label fw-semibold") }}
+                        {{ form.release_notes(class="form-control" + (" is-invalid" if form.release_notes.errors else ""), rows="3", placeholder="Court order, authority, or other release details.") }}
+                        {% for error in form.release_notes.errors %}
+                        <div class="invalid-feedback">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+                </div>
+                <div class="d-flex justify-content-end gap-2 mt-4">
+                    <a href="{{ url_for('auth.dashboard') }}" class="btn btn-outline-secondary">Cancel</a>
+                    {{ form.submit(class="btn btn-success fw-semibold", id="releaseSubmit", onclick="return confirm('Confirm and record this discharge?')") }}
+                </div>
+            </form>
+        </div>
+    </section>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const searchUrl = {{ url_for('inmate.api_release_search')|tojson }};
+const historyUrl = {{ url_for('inmate.api_release_history', inmate_id=0)|tojson }}.replace(/0$/, '');
+const scanUrl = {{ url_for('inmate.api_release_fingerprint')|tojson }};
+const initialInmateId = {{ selected_inmate_id|default(form.inmate_id.data or '', true)|tojson }};
+const searchInput = document.getElementById('inmateSearch');
+const searchResults = document.getElementById('searchResults');
+const searchStatus = document.getElementById('searchStatus');
+const hiddenInmateId = document.getElementById('inmate_id');
+const scanButton = document.getElementById('scanFingerprintBtn');
+const releaseSubmit = document.getElementById('releaseSubmit');
+let searchTimer;
+let selectedInmate = null;
+let fingerprintVerified = false;
+
+releaseSubmit.disabled = true;
+
+searchInput.addEventListener('input', () => {
+    window.clearTimeout(searchTimer);
+    clearSelection();
+    const query = searchInput.value.trim();
+    searchResults.replaceChildren();
+    if (query.length < 2) {
+        searchStatus.textContent = 'Type at least 2 characters to search active inmates.';
+        return;
+    }
+    searchStatus.textContent = 'Searching…';
+    searchTimer = window.setTimeout(() => searchInmates(query), 250);
+});
+
+async function searchInmates(query) {
+    try {
+        const response = await fetch(`${searchUrl}?q=${encodeURIComponent(query)}`);
+        if (!response.ok) throw new Error('Could not search inmate records.');
+        const data = await response.json();
+        searchResults.replaceChildren();
+        searchStatus.textContent = data.results.length
+            ? `${data.results.length} active inmate(s) found. Select the correct record.`
+            : 'No active inmates match that search.';
+        data.results.forEach(inmate => {
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'list-group-item list-group-item-action';
+            button.textContent = `${inmate.inmate_number} — ${inmate.full_name}${inmate.cell_block ? ` (Cell ${inmate.cell_block})` : ''}`;
+            button.addEventListener('click', () => selectInmate(inmate));
+            searchResults.append(button);
+        });
+    } catch (error) {
+        searchStatus.textContent = error.message;
+    }
+}
+
+async function selectInmate(inmate) {
+    clearSelection();
+    selectedInmate = inmate;
+    hiddenInmateId.value = inmate.inmate_id;
+    searchInput.value = `${inmate.inmate_number} — ${inmate.full_name}`;
+    searchResults.replaceChildren();
+    searchStatus.textContent = 'Loading the inmate record and history…';
+    try {
+        const response = await fetch(`${historyUrl}${inmate.inmate_id}`);
+        if (!response.ok) throw new Error('Could not load this inmate’s history.');
+        const history = await response.json();
+        renderInmateSummary(history.inmate);
+        renderRows('admissionHistoryBody', history.admissions, [
+            ['Date', 'date'], ['Admission type', 'type'], ['Reason', 'reason'],
+            ['Release date', 'release_date'], ['Release type', 'release_type'],
+            ['Notes', 'release_notes'], ['Cash returned (UGX)', 'release_cash_amount'],
+            ['Property returned / claims', 'release_property_claims'],
+            ['Discharged at', 'released_at'], ['Current episode', 'current']
+        ]);
+        renderRows('medicalHistoryBody', history.medical_records, [
+            ['Date', 'date'], ['Type', 'type'], ['Diagnosis', 'diagnosis'],
+            ['Treatment', 'treatment'], ['Notes', 'notes']
+        ]);
+        renderRows('disciplinaryHistoryBody', history.disciplinary_history, [
+            ['Date', 'date'], ['Incident', 'type'], ['Description', 'description'],
+            ['Action', 'action'], ['Punishment', 'punishment']
+        ]);
+        renderRows('auditHistoryBody', history.audit_history, [
+            ['Date', 'date'], ['Activity', 'type'], ['Details', 'description']
+        ]);
+        document.getElementById('historySection').hidden = false;
+        document.getElementById('biometricSection').hidden = false;
+        document.getElementById('releaseSection').hidden = false;
+        searchStatus.textContent = 'Record loaded. Review the history, then verify the fingerprint.';
+        if (!history.inmate.biometric_enrolled) {
+            setBiometricResult('This inmate has no enrolled fingerprint; biometric confirmation cannot proceed.', false);
+            scanButton.disabled = true;
+        }
+    } catch (error) {
+        clearSelection();
+        searchStatus.textContent = error.message;
+    }
+}
+
+function renderInmateSummary(inmate) {
+    const container = document.getElementById('inmateSummary');
+    container.replaceChildren();
+    const fields = [
+        ['Name', inmate.full_name], ['Inmate number', inmate.inmate_number],
+        ['Date of birth', inmate.date_of_birth], ['Gender', inmate.gender],
+        ['Nationality', inmate.nationality], ['Tribe', inmate.tribe],
+        ['Religion', inmate.religion], ['National ID', inmate.national_id_number],
+        ['Passport', inmate.passport_number], ['Aliases', inmate.alias_names],
+        ['Next of kin', inmate.next_of_kin_name],
+        ['Next-of-kin relationship', inmate.next_of_kin_relationship],
+        ['Next-of-kin phone', inmate.next_of_kin_phone],
+        ['Next-of-kin address', inmate.next_of_kin_address],
+        ['Height (cm)', inmate.height_cm], ['Weight (kg)', inmate.weight_kg],
+        ['Eye color', inmate.eye_color], ['Hair color', inmate.hair_color],
+        ['Distinguishing marks', inmate.distinguishing_marks],
+        ['Offence', inmate.crime_category], ['Case number', inmate.court_case_number],
+        ['Court', inmate.sentencing_court], ['Sentence', inmate.sentence_type],
+        ['Sentence duration', inmate.sentence_duration],
+        ['Sentence start', inmate.sentence_start_date],
+        ['Expected release', inmate.expected_release_date],
+        ['Current cell', [inmate.cell_block, inmate.cell_number].filter(Boolean).join(' / ')],
+        ['Security classification', inmate.security_classification],
+        ['Medical condition', inmate.has_medical_condition],
+        ['Medical alert', inmate.medical_alert], ['Risk level', inmate.risk_level],
+        ['Violence history', inmate.violence_history],
+        ['Escape-attempt history', inmate.escape_attempt_history],
+        ['Total admissions', inmate.total_admissions]
+    ];
+    fields.forEach(([label, value]) => {
+        const column = document.createElement('div');
+        column.className = 'col-6 col-lg-4';
+        const item = document.createElement('div');
+        item.className = 'border rounded p-2 h-100';
+        const heading = document.createElement('div');
+        heading.className = 'small text-muted';
+        heading.textContent = label;
+        const content = document.createElement('div');
+        content.className = 'fw-semibold';
+        content.textContent = value || '—';
+        item.append(heading, content);
+        column.append(item);
+        container.append(column);
+    });
+}
+
+function renderRows(containerId, records, fields) {
+    const container = document.getElementById(containerId);
+    container.replaceChildren();
+    if (!records.length) {
+        container.textContent = 'No records found.';
+        return;
+    }
+    records.forEach(record => {
+        const article = document.createElement('article');
+        article.className = 'border rounded p-3 mb-2';
+        fields.forEach(([label, key]) => {
+            if (record[key] === null || record[key] === undefined || record[key] === '') return;
+            const line = document.createElement('div');
+            const strong = document.createElement('strong');
+            strong.textContent = `${label}: `;
+            line.append(strong, document.createTextNode(String(record[key])));
+            article.append(line);
+        });
+        container.append(article);
+    });
+}
+
+scanButton.addEventListener('click', async () => {
+    if (!selectedInmate) return;
+    const scannedInmateId = selectedInmate.inmate_id;
+    scanButton.disabled = true;
+    scanButton.textContent = 'Scanning… keep finger on the reader';
+    setBiometricResult('Waiting for a fingerprint match…', false);
+    try {
+        const response = await fetch(scanUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ inmate_id: selectedInmate.inmate_id })
+        });
+        const result = await response.json();
+        if (!selectedInmate || selectedInmate.inmate_id !== scannedInmateId) return;
+        if (!response.ok || !result.ok) throw new Error(result.error || 'Fingerprint verification failed.');
+        fingerprintVerified = true;
+        releaseSubmit.disabled = false;
+        setBiometricResult(`Fingerprint matched (${result.score}% confidence). You can complete the form.`, true);
+    } catch (error) {
+        fingerprintVerified = false;
+        releaseSubmit.disabled = true;
+        setBiometricResult(error.message, false);
+    } finally {
+        scanButton.innerHTML = '<i class="bi bi-fingerprint"></i> Scan fingerprint';
+        if (selectedInmate && selectedInmate.inmate_id === scannedInmateId) {
+            scanButton.disabled = !selectedInmate.biometric_enrolled;
+        }
+    }
+});
+
+document.getElementById('releaseForm').addEventListener('submit', event => {
+    if (!fingerprintVerified) {
+        event.preventDefault();
+        setBiometricResult('Fingerprint verification is required before submitting.', false);
+    }
+});
+
+function setBiometricResult(message, success) {
+    const result = document.getElementById('biometricResult');
+    result.className = `mt-3 alert ${success ? 'alert-success' : 'alert-warning'}`;
+    result.textContent = message;
+}
+
+function clearSelection() {
+    selectedInmate = null;
+    fingerprintVerified = false;
+    hiddenInmateId.value = '';
+    releaseSubmit.disabled = true;
+    scanButton.disabled = false;
+    document.getElementById('historySection').hidden = true;
+    document.getElementById('biometricSection').hidden = true;
+    document.getElementById('releaseSection').hidden = true;
+    document.getElementById('biometricResult').replaceChildren();
+}
+
+if (initialInmateId) {
+    fetch(`${historyUrl}${encodeURIComponent(initialInmateId)}`)
+        .then(response => {
+            if (!response.ok) throw new Error('Previously selected inmate is no longer active.');
+            return response.json();
+        })
+        .then(data => selectInmate({
+            inmate_id: data.inmate.inmate_id,
+            inmate_number: data.inmate.inmate_number,
+            full_name: data.inmate.full_name,
+            cell_block: data.inmate.cell_block,
+            biometric_enrolled: data.inmate.biometric_enrolled
+        }))
+        .catch(error => {
+            searchStatus.textContent = error.message;
+        });
+}
+</script>
+{% endblock %}

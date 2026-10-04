@@ -1,0 +1,87 @@
+.dashboard-background {
+    position: relative;
+    isolation: isolate;
+    background: #dfe5e8;
+}
+
+.dashboard-slideshow {
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    overflow: hidden;
+    pointer-events: none;
+    background: #dfe5e8;
+}
+
+.dashboard-slide {
+    position: absolute;
+    inset: -2%;
+    background-position: center;
+    background-repeat: no-repeat;
+    background-size: cover;
+    filter: blur(3px);
+    opacity: 0;
+    transform: scale(1.06);
+    animation: dashboard-slide-show 27s ease-in-out infinite;
+    will-change: opacity, transform;
+}
+
+.dashboard-slide-gate {
+    background-image: url("../images/luzira-gate-entrance.png");
+    animation-delay: 0s;
+}
+
+.dashboard-slide-ceremony {
+    background-image: url("../images/luzira-ceremonial-gate.png");
+    animation-delay: 9s;
+}
+
+.dashboard-slide-yard {
+    background-image: url("../images/luzira-recreation-yard.png");
+    animation-delay: 18s;
+}
+
+.dashboard-slide-shade {
+    position: absolute;
+    inset: 0;
+    background: rgba(235, 241, 244, .58);
+}
+
+.dashboard-background > :not(.dashboard-slideshow) {
+    position: relative;
+    z-index: 0;
+}
+
+.dashboard-background .dashboard-page {
+    background: transparent;
+}
+
+@keyframes dashboard-slide-show {
+    0% {
+        opacity: 0;
+        transform: scale(1.06);
+    }
+    5% {
+        opacity: 1;
+    }
+    29% {
+        opacity: 1;
+        transform: scale(1.12);
+    }
+    34%,
+    100% {
+        opacity: 0;
+        transform: scale(1.14);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .dashboard-slide {
+        animation: none;
+        transform: none;
+    }
+
+    .dashboard-slide-gate {
+        opacity: 1;
+    }
+}

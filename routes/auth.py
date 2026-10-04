@@ -224,10 +224,11 @@ def change_password():
     return render_template('auth/change_password.html', form=form)
 
 
-from datetime import date, timedelta
+from datetime import datetime, time, timedelta, timezone
 from flask import render_template
 from flask_login import login_required, current_user
 from sqlalchemy import func
+from zoneinfo import ZoneInfo
 
 # Import your database extensions and models here
 from extensions import db
@@ -236,10 +237,24 @@ from models.visitor import Visitor
 from models.visit import VisitLog
 from models.cell import CellBlock  # Adjust model import if named differently
 
+FACILITY_TIMEZONE = ZoneInfo('Africa/Kampala')
+
+
+def _utc_bounds_for_facility_date(day):
+    local_start = datetime.combine(day, time.min, tzinfo=FACILITY_TIMEZONE)
+    local_end = datetime.combine(day + timedelta(days=1), time.min, tzinfo=FACILITY_TIMEZONE)
+    return (
+        local_start.astimezone(timezone.utc).replace(tzinfo=None),
+        local_end.astimezone(timezone.utc).replace(tzinfo=None),
+    )
+
+
 @auth_bp.route('/dashboard')
 @login_required
 def dashboard():
-    today = date.today()
+    from models.inmate import AdmissionEpisode
+
+    today = datetime.now(FACILITY_TIMEZONE).date()
     role = getattr(current_user, 'role_name', 'User')
 
     # 1. Inmate Metrics
@@ -247,22 +262,30 @@ def dashboard():
     total_inmates_ever = Inmate.query.count()
 
     # 2. Visitor Metrics
+    today_visit_start, tomorrow_visit_start = _utc_bounds_for_facility_date(today)
     total_daily_visits = VisitLog.query.filter(
-        func.date(getattr(VisitLog, 'check_in_time', getattr(VisitLog, 'created_at', None))) == today
-    ).count() if hasattr(VisitLog, 'check_in_time') else 0
+        VisitLog.check_in_time >= today_visit_start,
+        VisitLog.check_in_time < tomorrow_visit_start,
+    ).count()
     total_visitors_ever = Visitor.query.count()
 
     # 3. Daily Movement Metrics
     total_daily_intakes = Inmate.query.filter(
         func.date(getattr(Inmate, 'admission_date', getattr(Inmate, 'created_at', None))) == today
     ).count()
-    total_daily_releases = Inmate.query.filter(
-        func.date(getattr(Inmate, 'release_date', None)) == today
-    ).count() if hasattr(Inmate, 'release_date') else 0
+    total_daily_releases = AdmissionEpisode.query.filter_by(
+        release_date=today
+    ).count()
     total_inmate_deaths = Inmate.query.filter_by(status='Deceased').count() if hasattr(Inmate, 'status') else 0
 
     # 4. Cell Blocks & Occupancy Calculations
     cell_blocks = CellBlock.query.all() if 'CellBlock' in globals() else []
+    cell_occupancy_by_name = dict(
+        db.session.query(Inmate.cell_block, func.count(Inmate.inmate_id))
+        .filter(Inmate.status == 'Active', Inmate.cell_block.isnot(None))
+        .group_by(Inmate.cell_block)
+        .all()
+    )
     total_capacity = sum(getattr(b, 'capacity', 0) for b in cell_blocks) or 1000
     total_occupied = total_inmates_now
     overall_capacity_pct = round((total_occupied / total_capacity) * 100, 1) if total_capacity > 0 else 0
@@ -276,11 +299,14 @@ def dashboard():
         for d in days
     ]
     chart_releases = [
-        Inmate.query.filter(func.date(getattr(Inmate, 'release_date', None)) == d).count() if hasattr(Inmate, 'release_date') else 0
+        AdmissionEpisode.query.filter_by(release_date=d).count()
         for d in days
     ]
     chart_visitors = [
-        VisitLog.query.filter(func.date(getattr(VisitLog, 'check_in_time', getattr(VisitLog, 'created_at', None))) == d).count()
+        VisitLog.query.filter(
+            VisitLog.check_in_time >= _utc_bounds_for_facility_date(d)[0],
+            VisitLog.check_in_time < _utc_bounds_for_facility_date(d)[1],
+        ).count()
         for d in days
     ]
 
@@ -298,6 +324,7 @@ def dashboard():
         total_capacity=total_capacity,
         overall_capacity_pct=overall_capacity_pct,
         cell_blocks=cell_blocks,
+        cell_occupancy_by_name=cell_occupancy_by_name,
         chart_labels=chart_labels,
         chart_intakes=chart_intakes,
         chart_releases=chart_releases,

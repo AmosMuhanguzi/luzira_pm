@@ -5,9 +5,10 @@ class CellBlock(db.Model):
     __tablename__ = 'cell_blocks'
 
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(10), unique=True, nullable=False)
+    name = db.Column(db.String(50), unique=True, nullable=False)
     capacity = db.Column(db.Integer, default=100, nullable=False)
     current_occupancy = db.Column(db.Integer, default=0, nullable=False)
+    security_classification = db.Column(db.String(20), nullable=True)
 
     @staticmethod
     def generate_next_name():

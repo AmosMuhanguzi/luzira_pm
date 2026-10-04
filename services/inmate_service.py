@@ -6,11 +6,76 @@ import base64
 from datetime import date, datetime
 from sqlalchemy import or_, func
 from extensions import db
+from models.cell import CellBlock
 from models.inmate import Inmate, AdmissionEpisode
 from models.audit import AuditEvent
 
 
 class InmateService:
+    SECURITY_CLASSIFICATIONS = ('Minimum', 'Medium', 'Maximum')
+
+    @staticmethod
+    def cell_block_options(security_classification=None):
+        query = CellBlock.query
+        if security_classification:
+            query = query.filter_by(
+                security_classification=security_classification
+            )
+
+        blocks = query.order_by(CellBlock.name.asc()).all()
+        occupancy_by_name = dict(
+            db.session.query(Inmate.cell_block, func.count(Inmate.inmate_id))
+            .filter(Inmate.status == 'Active', Inmate.cell_block.isnot(None))
+            .group_by(Inmate.cell_block)
+            .all()
+        )
+        return [{
+            'name': block.name,
+            'security_classification': block.security_classification,
+            'capacity': block.capacity,
+            'occupancy': occupancy_by_name.get(block.name, 0),
+            'available': occupancy_by_name.get(block.name, 0) < block.capacity,
+        } for block in blocks]
+
+    @staticmethod
+    def validate_cell_assignment(cell_name, security_classification):
+        if security_classification not in InmateService.SECURITY_CLASSIFICATIONS:
+            return 'Select a valid security classification before assigning a cell.'
+        if not cell_name:
+            return None
+
+        option = next(
+            (
+                cell for cell in InmateService.cell_block_options(security_classification)
+                if cell['name'] == cell_name
+            ),
+            None,
+        )
+        if not option:
+            return (
+                f'Cell block "{cell_name}" is not configured for '
+                f'{security_classification} classification.'
+            )
+        if not option['available']:
+            return f'Cell block "{cell_name}" is at capacity.'
+        return None
+
+    @staticmethod
+    def suggest_cell_block(security_classification):
+        options = [
+            option for option in InmateService.cell_block_options(security_classification)
+            if option['available']
+        ]
+        if not options:
+            return None
+        return min(
+            options,
+            key=lambda option: (
+                option['occupancy'] / option['capacity'],
+                option['occupancy'],
+                option['name'],
+            ),
+        )
 
     # ---------- Read ----------
     @staticmethod
@@ -56,6 +121,13 @@ class InmateService:
         except (ValueError, TypeError):
             return None, 'Date of birth is not a valid date.'
 
+        security_classification = data.get('security_classification') or 'Medium'
+        cell_error = InmateService.validate_cell_assignment(
+            data.get('cell_block'), security_classification
+        )
+        if cell_error:
+            return None, cell_error
+
         inmate = Inmate(
             inmate_number=InmateService.generate_inmate_number(),
             full_name=data['full_name'].strip(),
@@ -78,7 +150,7 @@ class InmateService:
             sentence_duration=data.get('sentence_duration'),
             cell_block=data.get('cell_block'),
             cell_number=data.get('cell_number'),
-            security_classification=data.get('security_classification') or 'Medium',
+            security_classification=security_classification,
             has_medical_condition=_to_bool(data.get('has_medical_condition')),
             medical_alert=data.get('medical_alert'),
             status='Active',
@@ -132,18 +204,38 @@ class InmateService:
         if not inmate:
             return None, 'Inmate not found.'
 
+        security_classification = (
+            data.get('security_classification')
+            or inmate.security_classification
+            or 'Medium'
+        )
+        cell_name = data.get('cell_block', inmate.cell_block) or None
+        cell_error = InmateService.validate_cell_assignment(
+            cell_name, security_classification
+        )
+        if cell_error:
+            return None, cell_error
+
         current = inmate.admission_episodes.filter_by(is_current=True).first()
         if current:
             current.is_current = False
 
         editable = [
             'crime_category', 'crime_description', 'court_case_number',
-            'sentence_type', 'sentence_duration', 'cell_block', 'cell_number',
+            'sentence_type', 'sentence_duration', 'cell_number',
             'security_classification', 'next_of_kin_name',
             'next_of_kin_relationship', 'next_of_kin_phone',
             'next_of_kin_address', 'medical_alert',
         ]
         changes = []
+        if 'cell_block' in data:
+            new_cell_block = data.get('cell_block') or None
+            if inmate.cell_block != new_cell_block:
+                changes.append(
+                    f'cell_block: "{inmate.cell_block}" -> "{new_cell_block}"'
+                )
+                inmate.cell_block = new_cell_block
+
         for f in editable:
             if f in data and data[f] not in (None, ''):
                 old = getattr(inmate, f)
@@ -172,6 +264,7 @@ class InmateService:
 
         inmate.status = 'Active'
         inmate.current_admission_date = date.today()
+        inmate.actual_release_date = None
         inmate.total_admissions = (inmate.total_admissions or 0) + 1
         db.session.commit()
 

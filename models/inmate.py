@@ -1,4 +1,5 @@
 from datetime import datetime, date
+from sqlalchemy import Numeric
 from extensions import db
 from models.base import BaseModel
 
@@ -166,6 +167,10 @@ class AdmissionEpisode(BaseModel):
     release_date    = db.Column(db.Date)
     release_type    = db.Column(db.String(30))
     release_notes   = db.Column(db.Text)
+    release_cash_amount = db.Column(Numeric(12, 2), nullable=False, default=0)
+    release_property_claims = db.Column(db.Text)
+    released_at = db.Column(db.DateTime)
+    release_fingerprint_score = db.Column(Numeric(5, 2))
     releasing_officer_id = db.Column(db.Integer, db.ForeignKey('user_accounts.user_id'))
 
     is_current = db.Column(db.Boolean, default=True, index=True)
@@ -174,6 +179,5 @@ class AdmissionEpisode(BaseModel):
 
     def __repr__(self):
         return f'<Episode {self.episode_id} inmate={self.inmate_id} type={self.admission_type}>'
-
 
 

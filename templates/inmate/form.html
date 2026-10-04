@@ -157,8 +157,28 @@
             <div class="row g-3">
                 <div class="col-md-3">
                     <label class="form-label">Cell block</label>
-                    <input type="text" name="cell_block" class="form-control"
-                           value="{{ data.cell_block or (inmate.cell_block if editing else '') }}">
+                    <div class="input-group">
+                        <select id="cellBlock" name="cell_block" class="form-select">
+                            <option value="">-- leave unassigned --</option>
+                            {% for cell in cell_blocks %}
+                            {% if cell.available or cell.name == (data.cell_block or (inmate.cell_block if editing else '')) %}
+                            <option value="{{ cell.name }}"
+                                    data-classification="{{ cell.security_classification or '' }}"
+                                    {{ 'selected' if (data.cell_block or (inmate.cell_block if editing else '')) == cell.name }}>
+                                {{ cell.name }} ({{ cell.occupancy }}/{{ cell.capacity }})
+                            </option>
+                            {% endif %}
+                            {% endfor %}
+                        </select>
+                        <button id="autoAssignCell" type="button"
+                                class="btn btn-outline-primary"
+                                title="Assign the least-occupied suitable cell block">
+                            <i class="bi bi-magic"></i> Auto
+                        </button>
+                    </div>
+                    <div id="cellAssignmentStatus" class="form-text" aria-live="polite">
+                        Choose a suitable block manually for special placements, or use Auto to balance occupancy.
+                    </div>
                 </div>
                 <div class="col-md-3">
                     <label class="form-label">Cell number</label>
@@ -217,4 +237,57 @@
         </button>
     </div>
 </form>
+
+<script>
+const cellAssignmentUrl = {{ url_for('inmate.api_cell_assignment')|tojson }};
+const cellBlockSelect = document.getElementById('cellBlock');
+const securityClassSelect = document.querySelector('[name="security_classification"]');
+const autoAssignCellButton = document.getElementById('autoAssignCell');
+const cellAssignmentStatus = document.getElementById('cellAssignmentStatus');
+const cellBlockOptions = {{ cell_blocks|tojson }};
+
+function refreshCellBlockOptions() {
+    const selectedClass = securityClassSelect.value;
+    const currentValue = cellBlockSelect.value;
+    Array.from(cellBlockSelect.options).forEach(option => {
+        if (!option.value) return;
+        const block = cellBlockOptions.find(item => item.name === option.value);
+        option.hidden = !block || block.security_classification !== selectedClass;
+        if (block) {
+            option.disabled = !block.available && option.value !== currentValue;
+        }
+    });
+    if (cellBlockSelect.selectedOptions[0]?.hidden) {
+        cellBlockSelect.value = '';
+    }
+}
+
+securityClassSelect.addEventListener('change', () => {
+    refreshCellBlockOptions();
+    cellAssignmentStatus.textContent =
+        'Choose a suitable block manually for special placements, or use Auto to balance occupancy.';
+});
+
+autoAssignCellButton.addEventListener('click', async () => {
+    autoAssignCellButton.disabled = true;
+    cellAssignmentStatus.textContent = 'Finding the least-occupied suitable block…';
+    try {
+        const response = await fetch(
+            `${cellAssignmentUrl}?security_classification=${encodeURIComponent(securityClassSelect.value)}`
+        );
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || 'Cell assignment failed.');
+        cellBlockSelect.value = result.cell_block.name;
+        cellAssignmentStatus.textContent =
+            `Assigned ${result.cell_block.name}: ${result.cell_block.occupancy}/${result.cell_block.capacity} occupied.`;
+    } catch (error) {
+        cellBlockSelect.value = '';
+        cellAssignmentStatus.textContent = error.message;
+    } finally {
+        autoAssignCellButton.disabled = false;
+    }
+});
+
+refreshCellBlockOptions();
+</script>
 {% endblock %}

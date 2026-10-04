@@ -1,0 +1,123 @@
+{% extends "admin/_layout.html" %}
+{% block title %}Cell Blocks — Luzira PMS{% endblock %}
+
+{% block admin_content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <h3 class="mb-1"><i class="bi bi-building"></i> Cell Blocks</h3>
+        <p class="text-muted mb-0">Manage cell names, capacities, and security classifications used for inmate placement.</p>
+    </div>
+</div>
+
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-header bg-white py-3">
+        <h5 class="mb-0"><i class="bi bi-plus-circle text-success"></i> Add a cell block</h5>
+    </div>
+    <div class="card-body">
+        <form method="POST" class="row g-3 align-items-end" novalidate>
+            {{ form.hidden_tag() }}
+            <div class="col-md-4">
+                {{ form.name.label(class="form-label fw-semibold") }}
+                {{ form.name(class="form-control" + (" is-invalid" if form.name.errors else ""), placeholder="For example, A or North-1") }}
+                {% for error in form.name.errors %}
+                <div class="invalid-feedback">{{ error }}</div>
+                {% endfor %}
+            </div>
+            <div class="col-md-3">
+                {{ form.capacity.label(class="form-label fw-semibold") }}
+                {{ form.capacity(class="form-control" + (" is-invalid" if form.capacity.errors else ""), min="1", type="number") }}
+                {% for error in form.capacity.errors %}
+                <div class="invalid-feedback">{{ error }}</div>
+                {% endfor %}
+            </div>
+            <div class="col-md-3">
+                {{ form.security_classification.label(class="form-label fw-semibold") }}
+                {{ form.security_classification(class="form-select" + (" is-invalid" if form.security_classification.errors else "")) }}
+                {% for error in form.security_classification.errors %}
+                <div class="invalid-feedback">{{ error }}</div>
+                {% endfor %}
+            </div>
+            <div class="col-md-2">
+                {{ form.submit(class="btn btn-success w-100") }}
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="card border-0 shadow-sm">
+    <div class="card-header bg-white py-3">
+        <h5 class="mb-0">Configured cell blocks</h5>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>Cell block</th>
+                    <th>Capacity</th>
+                    <th>Active occupancy</th>
+                    <th>Security classification</th>
+                    <th class="text-end">Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for cell in cell_blocks %}
+                {% set occupancy = occupancy_by_name.get(cell.name, 0) %}
+                <tr>
+                    <td class="fw-semibold">{{ cell.name }}</td>
+                    <td>{{ cell.capacity }}</td>
+                    <td>
+                        <span class="badge {{ 'bg-danger' if occupancy else 'bg-success' }}">
+                            {{ occupancy }} / {{ cell.capacity }}
+                        </span>
+                    </td>
+                    <td>
+                        <form method="POST"
+                              action="{{ url_for('admin.cell_classification', cell_id=cell.id) }}"
+                              class="d-flex gap-2">
+                            {{ delete_form.hidden_tag() }}
+                            <select name="security_classification" class="form-select form-select-sm"
+                                    aria-label="Security classification for {{ cell.name }}">
+                                {% for classification in ['Minimum', 'Medium', 'Maximum'] %}
+                                <option value="{{ classification }}"
+                                        {{ 'selected' if cell.security_classification == classification }}>
+                                    {{ classification }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                            <button type="submit" class="btn btn-sm btn-outline-primary">Save</button>
+                        </form>
+                        {% if not cell.security_classification %}
+                        <div class="small text-warning mt-1">Unassigned — auto-placement unavailable</div>
+                        {% endif %}
+                    </td>
+                    <td class="text-end">
+                        {% if occupancy == 0 %}
+                        <form method="POST"
+                              action="{{ url_for('admin.cell_delete', cell_id=cell.id) }}"
+                              class="d-inline"
+                              onsubmit="return confirm('Delete empty cell block {{ cell.name }}?');">
+                            {{ delete_form.hidden_tag() }}
+                            <button type="submit" class="btn btn-sm btn-outline-danger">
+                                <i class="bi bi-trash"></i> Delete
+                            </button>
+                        </form>
+                        {% else %}
+                        <button type="button" class="btn btn-sm btn-outline-secondary" disabled
+                                title="Move active inmates before deleting this cell block.">
+                            <i class="bi bi-lock"></i> In use
+                        </button>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="5" class="text-center text-muted py-4">
+                        No cell blocks are configured yet.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

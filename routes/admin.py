@@ -4,10 +4,15 @@ from flask import (Blueprint, render_template, redirect, url_for,
 from flask_login import login_required, current_user
 from flask_wtf import FlaskForm
 from wtforms import (StringField, PasswordField, SelectField,
-                     BooleanField, SubmitField)
-from wtforms.validators import DataRequired, Length, Email, Optional
+                     BooleanField, IntegerField, SubmitField)
+from wtforms.validators import DataRequired, Length, Email, Optional, NumberRange
+from sqlalchemy import func
+from sqlalchemy.exc import IntegrityError
 
-from extensions import csrf
+from extensions import csrf, db
+from models.audit import AuditEvent
+from models.cell import CellBlock
+from models.inmate import Inmate
 from services.user_service import UserService
 from services.rbac import require_role
 
@@ -44,6 +49,40 @@ class ResetPasswordForm(FlaskForm):
     confirm_password = PasswordField('Confirm password',
                                      validators=[DataRequired()])
     submit           = SubmitField('Reset password')
+
+
+class CellBlockForm(FlaskForm):
+    name = StringField(
+        'Cell block name',
+        validators=[DataRequired(), Length(max=50)],
+    )
+    capacity = IntegerField(
+        'Capacity',
+        validators=[DataRequired(), NumberRange(min=1)],
+    )
+    security_classification = SelectField(
+        'Security classification',
+        choices=[('Minimum', 'Minimum'), ('Medium', 'Medium'), ('Maximum', 'Maximum')],
+        validators=[DataRequired()],
+    )
+    submit = SubmitField('Add cell block')
+
+
+class CellClassificationForm(FlaskForm):
+    security_classification = SelectField(
+        'Security classification',
+        choices=[
+            ('Minimum', 'Minimum'),
+            ('Medium', 'Medium'),
+            ('Maximum', 'Maximum'),
+        ],
+        validators=[DataRequired()],
+    )
+    submit = SubmitField('Save')
+
+
+class CellDeleteForm(FlaskForm):
+    submit = SubmitField('Delete')
 
 
 def _populate_roles(form):
@@ -222,3 +261,170 @@ def user_delete(user_id):
     )
     flash(error or 'User deleted.', 'danger' if error else 'success')
     return redirect(url_for('admin.users_list'))
+
+
+@admin_bp.route('/cells', methods=['GET', 'POST'])
+@login_required
+@require_role('System Administrator')
+def cells():
+    form = CellBlockForm()
+
+    if form.validate_on_submit():
+        name = form.name.data.strip()
+        duplicate = CellBlock.query.filter(
+            func.lower(CellBlock.name) == name.lower()
+        ).first()
+        if duplicate:
+            form.name.errors.append('A cell block with this name already exists.')
+        else:
+            cell = CellBlock(
+                name=name,
+                capacity=form.capacity.data,
+                security_classification=form.security_classification.data,
+            )
+            db.session.add(cell)
+            try:
+                db.session.flush()
+                AuditEvent.log_event(
+                    event_category='Facility',
+                    event_type='Cell block created',
+                    event_description=(
+                        f'Created cell block {name} with capacity {cell.capacity}.'
+                    ),
+                    entity_type='CellBlock',
+                    entity_id=cell.id,
+                    user_id=current_user.user_id,
+                    username=current_user.username,
+                    user_role=current_user.role_name,
+                    ip_address=request.remote_addr,
+                    user_agent=request.headers.get('User-Agent'),
+                    new_values={
+                        'name': name,
+                        'capacity': cell.capacity,
+                        'security_classification': cell.security_classification,
+                    },
+                )
+                db.session.commit()
+            except IntegrityError:
+                db.session.rollback()
+                form.name.errors.append(
+                    'A cell block with this name already exists.'
+                )
+            else:
+                flash(f'Cell block "{name}" was added.', 'success')
+                return redirect(url_for('admin.cells'))
+
+    cell_blocks = CellBlock.query.order_by(CellBlock.name.asc()).all()
+    occupancy_by_name = dict(
+        db.session.query(Inmate.cell_block, func.count(Inmate.inmate_id))
+        .filter(Inmate.status == 'Active', Inmate.cell_block.isnot(None))
+        .group_by(Inmate.cell_block)
+        .all()
+    )
+    return render_template(
+        'admin/cells.html',
+        form=form,
+        delete_form=CellDeleteForm(),
+        cell_blocks=cell_blocks,
+        occupancy_by_name=occupancy_by_name,
+    )
+
+
+@admin_bp.route('/cells/<int:cell_id>/classification', methods=['POST'])
+@login_required
+@require_role('System Administrator')
+def cell_classification(cell_id):
+    form = CellClassificationForm()
+    if not form.validate_on_submit():
+        flash('The classification update could not be validated.', 'danger')
+        return redirect(url_for('admin.cells'))
+
+    cell = CellBlock.query.get_or_404(cell_id)
+    active_inmates = Inmate.query.filter(
+        Inmate.cell_block == cell.name,
+        Inmate.status == 'Active',
+    ).all()
+    old_classification = cell.security_classification
+    previous_classifications = {}
+    for inmate in active_inmates:
+        classification = inmate.security_classification or 'Unassigned'
+        previous_classifications[classification] = (
+            previous_classifications.get(classification, 0) + 1
+        )
+        inmate.security_classification = form.security_classification.data
+
+    cell.security_classification = form.security_classification.data
+    AuditEvent.log_event(
+        event_category='Facility',
+        event_type='Cell block classification updated',
+        event_description=(
+            f'Updated cell block {cell.name} classification from '
+            f'{old_classification or "Unassigned"} to {cell.security_classification}; '
+            f'reclassified {len(active_inmates)} active inmate(s).'
+        ),
+        entity_type='CellBlock',
+        entity_id=cell.id,
+        user_id=current_user.user_id,
+        username=current_user.username,
+        user_role=current_user.role_name,
+        ip_address=request.remote_addr,
+        user_agent=request.headers.get('User-Agent'),
+        old_values={
+            'security_classification': old_classification,
+            'active_inmate_classifications': previous_classifications,
+        },
+        new_values={
+            'security_classification': cell.security_classification,
+            'active_inmates_reclassified': len(active_inmates),
+        },
+    )
+    db.session.commit()
+    flash(
+        f'Cell block "{cell.name}" classification was updated; '
+        f'{len(active_inmates)} active inmate(s) were reclassified.',
+        'success',
+    )
+    return redirect(url_for('admin.cells'))
+
+
+@admin_bp.route('/cells/<int:cell_id>/delete', methods=['POST'])
+@login_required
+@require_role('System Administrator')
+def cell_delete(cell_id):
+    form = CellDeleteForm()
+    if not form.validate_on_submit():
+        flash('The delete request could not be validated. Please try again.', 'danger')
+        return redirect(url_for('admin.cells'))
+
+    cell = CellBlock.query.get_or_404(cell_id)
+    occupancy = Inmate.query.filter_by(
+        cell_block=cell.name,
+        status='Active',
+    ).count()
+    if occupancy:
+        flash(
+            f'Cannot delete "{cell.name}": {occupancy} active '
+            f'inmate(s) are assigned to it.',
+            'danger',
+        )
+        return redirect(url_for('admin.cells'))
+
+    cell_name = cell.name
+    cell_capacity = cell.capacity
+    AuditEvent.log_event(
+        event_category='Facility',
+        event_type='Cell block deleted',
+        event_description=f'Deleted empty cell block {cell_name}.',
+        entity_type='CellBlock',
+        entity_id=cell.id,
+        user_id=current_user.user_id,
+        username=current_user.username,
+        user_role=current_user.role_name,
+        ip_address=request.remote_addr,
+        user_agent=request.headers.get('User-Agent'),
+        old_values={'name': cell_name, 'capacity': cell_capacity},
+    )
+    db.session.delete(cell)
+    db.session.commit()
+    flash(f'Empty cell block "{cell_name}" was deleted.', 'success')
+    return redirect(url_for('admin.cells'))

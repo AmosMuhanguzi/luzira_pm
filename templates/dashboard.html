@@ -1,9 +1,14 @@
 {% extends "base.html" %}
 {% block title %}Dashboard — Luzira PMS{% endblock %}
 
+{% block page_styles %}
+<link href="{{ url_for('static', filename='css/dashboard.css') }}" rel="stylesheet">
+{% endblock %}
+
 {% block content %}
+<div class="dashboard-page">
 <!-- Header Section -->
-<div class="row mb-3">
+<div class="row mb-3 dashboard-heading">
     <div class="col-12 d-flex justify-content-between align-items-center">
         <div>
             <h2 class="mb-1"><i class="bi bi-speedometer2"></i> Dashboard</h2>
@@ -16,7 +21,7 @@
 </div>
 
 <!-- QUICK-ACTION BAR -->
-<div class="card shadow-sm border-0 mb-4 bg-light">
+<div class="card shadow-sm border-0 mb-4 dashboard-quick-actions">
     <div class="card-body py-2 d-flex flex-wrap align-items-center justify-content-between gap-2">
         <span class="fw-bold text-secondary me-2"><i class="bi bi-lightning-charge-fill text-warning"></i> Quick Actions:</span>
         <div class="d-flex flex-wrap gap-2">
@@ -59,53 +64,53 @@
 
 <!-- REAL-TIME KPI METRICS BAR -->
 <div class="row g-3 mb-4">
-    <div class="col-md-3 col-sm-6">
-        <div class="card border-0 shadow-sm bg-primary text-white h-100">
+    <div class="col-6 col-md-4 col-xl-2">
+        <div class="card border-0 shadow-sm h-100 dashboard-kpi dashboard-kpi--inmates">
             <div class="card-body">
-                <div class="small opacity-75">Inmates (Now / Ever)</div>
+                <div class="dashboard-kpi-label"><span>Inmates (Now / Ever)</span><i class="bi bi-person-vcard-fill dashboard-kpi-icon" aria-hidden="true"></i></div>
                 <div class="fs-3 fw-bold">{{ total_inmates_now|default(0) }} <span class="fs-6 fw-normal">/ {{ total_inmates_ever|default(0) }}</span></div>
             </div>
         </div>
     </div>
-    <div class="col-md-3 col-sm-6">
-        <div class="card border-0 shadow-sm bg-info text-white h-100">
+    <div class="col-6 col-md-4 col-xl-2">
+        <div class="card border-0 shadow-sm h-100 dashboard-kpi dashboard-kpi--visitors">
             <div class="card-body">
-                <div class="small opacity-75">Visitors (Today / Ever)</div>
+                <div class="dashboard-kpi-label"><span>Visitors (Today / Ever)</span><i class="bi bi-people-fill dashboard-kpi-icon" aria-hidden="true"></i></div>
                 <div class="fs-3 fw-bold">{{ total_daily_visits|default(0) }} <span class="fs-6 fw-normal">/ {{ total_visitors_ever|default(0) }}</span></div>
             </div>
         </div>
     </div>
-    <div class="col-md-3 col-sm-6">
-        <div class="card border-0 shadow-sm bg-success text-white h-100">
+    <div class="col-6 col-md-4 col-xl-2">
+        <div class="card border-0 shadow-sm h-100 dashboard-kpi dashboard-kpi--intakes">
             <div class="card-body">
-                <div class="small opacity-75">Daily Intakes</div>
+                <div class="dashboard-kpi-label"><span>Daily Intakes</span><i class="bi bi-box-arrow-in-right dashboard-kpi-icon" aria-hidden="true"></i></div>
                 <div class="fs-3 fw-bold">{{ total_daily_intakes|default(0) }}</div>
             </div>
         </div>
     </div>
-    <div class="col-md-3 col-sm-6">
-        <div class="card border-0 shadow-sm bg-warning text-dark h-100">
+    <div class="col-6 col-md-4 col-xl-2">
+        <div class="card border-0 shadow-sm h-100 dashboard-kpi dashboard-kpi--releases">
             <div class="card-body">
-                <div class="small opacity-75">Daily Releases</div>
+                <div class="dashboard-kpi-label"><span>Daily Releases</span><i class="bi bi-box-arrow-right dashboard-kpi-icon" aria-hidden="true"></i></div>
                 <div class="fs-3 fw-bold">{{ total_daily_releases|default(0) }}</div>
             </div>
         </div>
     </div>
-    <div class="col-md-3 col-sm-6">
-        <div class="card border-0 shadow-sm bg-danger text-white h-100">
+    <div class="col-6 col-md-4 col-xl-2">
+        <div class="card border-0 shadow-sm h-100 dashboard-kpi dashboard-kpi--deaths">
             <div class="card-body">
-                <div class="small opacity-75">Inmate Deaths</div>
+                <div class="dashboard-kpi-label"><span>Inmate Deaths</span><i class="bi bi-heart-pulse-fill dashboard-kpi-icon" aria-hidden="true"></i></div>
                 <div class="fs-3 fw-bold">{{ total_inmate_deaths|default(0) }}</div>
             </div>
         </div>
     </div>
-    <div class="col-md-3 col-sm-6">
-        <div class="card border-0 shadow-sm bg-secondary text-white h-100">
+    <div class="col-6 col-md-4 col-xl-2">
+        <div class="card border-0 shadow-sm h-100 dashboard-kpi dashboard-kpi--occupancy">
             <div class="card-body">
-                <div class="small opacity-75">Total Occupancy</div>
+                <div class="dashboard-kpi-label"><span>Total Occupancy</span><i class="bi bi-building-fill dashboard-kpi-icon" aria-hidden="true"></i></div>
                 <div class="fs-3 fw-bold">{{ total_occupied|default(0) }} / {{ total_capacity|default(0) }}</div>
-                <div class="progress mt-2" style="height: 6px;">
-                    <div class="progress-bar bg-white" style="width: var(--cap-pct);" style="--cap-pct: {{ overall_capacity_pct|default(0) }}%;"></div>
+                <div class="progress dashboard-occupancy-progress mt-2" style="height: 6px;">
+                    <div class="progress-bar" style="width: {{ overall_capacity_pct|default(0) }}%;"></div>
                 </div>
             </div>
         </div>
@@ -116,7 +121,7 @@
 <div class="row g-4 mb-4">
     <!-- Visual Trends Graph -->
     <div class="col-lg-8">
-        <div class="card border-0 shadow-sm h-100">
+        <div class="card border-0 shadow-sm h-100 dashboard-panel">
             <div class="card-header bg-white fw-bold py-3"><i class="bi bi-graph-up text-primary"></i> Intake, Release & Visitor Trends</div>
             <div class="card-body">
                 <canvas id="analyticsChart" height="130"></canvas>
@@ -126,7 +131,7 @@
 
     <!-- Cell Blocks Capacity Bar View -->
     <div class="col-lg-4">
-        <div class="card border-0 shadow-sm h-100">
+        <div class="card border-0 shadow-sm h-100 dashboard-panel">
             <div class="card-header bg-white d-flex justify-content-between align-items-center py-3">
                 <span class="fw-bold"><i class="bi bi-building text-secondary"></i> Cell Blocks</span>
                 <span class="badge bg-dark">{{ cell_blocks|length if cell_blocks else 0 }} Blocks</span>
@@ -134,10 +139,10 @@
             <div class="card-body overflow-auto" style="max-height: 380px;">
                 {% if cell_blocks %}
                     {% for block in cell_blocks %}
-                        {% set current = block.current_occupancy if block.current_occupancy is defined else (block.inmates|length if block.inmates is defined else 0) %}
+                        {% set current = cell_occupancy_by_name.get(block.name, 0) %}
                         {% set cap = block.capacity if block.capacity and block.capacity > 0 else 100 %}
                         {% set pct = ((current / cap) * 100)|round(1) %}
-                        <div class="mb-3 p-2 rounded border cell-card position-relative shadow-sm" style="cursor: pointer; transition: transform 0.1s;" onclick="openCellModal('{{ block.id if block.id is defined else block.cell_id }}')">
+                        <div class="mb-3 p-2 rounded border cell-card position-relative shadow-sm" style="cursor: pointer;" onclick="openCellModal('{{ block.id if block.id is defined else block.cell_id }}')">
                             <div class="d-flex justify-content-between mb-1">
                                 <span class="fw-bold text-dark">{{ block.name }}</span>
                                 <small class="text-muted">{{ current }}/{{ cap }} ({{ (100 - pct)|round(1) }}% free)</small>
@@ -156,13 +161,6 @@
     </div>
 </div>
 
-{% if role not in ['System Administrator','Warden','Records Officer','Receptionist','Security Officer'] %}
-<div class="alert alert-warning shadow-sm">
-    Your role (<strong>{{ role }}</strong>) has no custom quick actions configured yet.
-</div>
-{% endif %}
-
-<!-- Dynamic Cell Inmates Modal -->
 <div class="modal fade" id="cellModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-centered">
         <div class="modal-content border-0 shadow">
@@ -201,6 +199,12 @@
         </div>
     </div>
 </div>
+{% if role not in ['System Administrator','Warden','Records Officer','Receptionist','Security Officer'] %}
+<div class="alert alert-warning shadow-sm">
+    Your role (<strong>{{ role }}</strong>) has no custom quick actions configured yet.
+</div>
+{% endif %}
+</div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
@@ -211,9 +215,9 @@
         data: {
             labels: {{ (chart_labels | default(['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'])) | tojson }},
             datasets: [
-                { label: 'Intakes', data: {{ (chart_intakes | default([0, 0, 0, 0, 0, 0, 0])) | tojson }}, borderColor: '#198754', tension: 0.3, fill: false },
-                { label: 'Releases', data: {{ (chart_releases | default([0, 0, 0, 0, 0, 0, 0])) | tojson }}, borderColor: '#ffc107', tension: 0.3, fill: false },
-                { label: 'Visitors', data: {{ (chart_visitors | default([0, 0, 0, 0, 0, 0, 0])) | tojson }}, borderColor: '#0dcaf0', tension: 0.3, fill: false }
+                { label: 'Intakes', data: {{ (chart_intakes | default([0, 0, 0, 0, 0, 0, 0])) | tojson }}, borderColor: '#059669', backgroundColor: '#059669', borderWidth: 3, pointRadius: 3, tension: 0.35, fill: false },
+                { label: 'Releases', data: {{ (chart_releases | default([0, 0, 0, 0, 0, 0, 0])) | tojson }}, borderColor: '#ea580c', backgroundColor: '#ea580c', borderWidth: 3, pointRadius: 3, tension: 0.35, fill: false },
+                { label: 'Visitors', data: {{ (chart_visitors | default([0, 0, 0, 0, 0, 0, 0])) | tojson }}, borderColor: '#0891b2', backgroundColor: '#0891b2', borderWidth: 3, pointRadius: 3, tension: 0.35, fill: false }
             ]
         },
         options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
