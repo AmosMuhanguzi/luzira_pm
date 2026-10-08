@@ -89,21 +89,32 @@
                         {% endif %}
                     </a>
                 </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="{{ url_for('medical_records.pending') }}">
+                        <i class="bi bi-heart-pulse"></i> Medical Approvals
+                        {% set mc = pending_medical_record_count() %}
+                        {% if mc > 0 %}
+                        <span class="badge bg-danger rounded-pill">{{ mc }}</span>
+                        {% endif %}
+                    </a>
+                </li>
                 {% endif %}
 
-                {# ----- Inmate records — Admin, Warden, Records, Reception ----- #}
+                {# ----- Inmate records ----- #}
                 {% if current_user.role_name in
-                      ['System Administrator', 'Warden', 'Records Officer', 'Receptionist'] %}
+                      ['System Administrator', 'Warden', 'Records Officer', 'Receptionist', 'Medical Officer'] %}
                 <li class="nav-item">
                     <a class="nav-link" href="{{ url_for('inmate.list_inmates') }}">
                         <i class="bi bi-person-vcard"></i> Inmates
                     </a>
                 </li>
+                {% if has_permission(Permissions.INMATE_RELEASE) %}
                 <li class="nav-item">
                     <a class="nav-link" href="{{ url_for('inmate.release_form') }}">
                         <i class="bi bi-box-arrow-right"></i> Release
                     </a>
                 </li>
+                {% endif %}
                 {% endif %}
                 {% if current_user.role_name in
                       ['System Administrator', 'Warden', 'Receptionist', 'Security Officer'] %}
@@ -123,7 +134,7 @@
                 {% endif %}
 
                 {# ----- Non-admins see "My Requests" ----- #}
-                {% if current_user.role_name != 'System Administrator' %}
+                {% if current_user.role_name not in ['System Administrator', 'Medical Officer'] %}
                 <li class="nav-item">
                     <a class="nav-link" href="{{ url_for('edit_requests.my_requests') }}">
                         <i class="bi bi-send-check"></i> My Requests

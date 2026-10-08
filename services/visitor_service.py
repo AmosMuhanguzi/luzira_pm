@@ -80,6 +80,7 @@ class VisitorService:
             'email': data.get('email'),
             'physical_address': data.get('physical_address'),
             'relationship_to_inmate': data.get('relationship_to_inmate'),
+            'photo_path': data.get('photo_path'),
             'total_visits': 0,
             'created_by': actor.user_id,
         }

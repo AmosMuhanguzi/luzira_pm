@@ -1,0 +1,80 @@
+{% extends "admin/_layout.html" %}
+{% block title %}Medical Record Approvals — Luzira PMS{% endblock %}
+
+{% block admin_content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h3 class="mb-0"><i class="bi bi-heart-pulse"></i> Medical Record Approvals</h3>
+    <a href="{{ url_for('admin.users_list') }}" class="btn btn-outline-secondary btn-sm">Admin</a>
+</div>
+
+{% for record in records %}
+<div class="card shadow-sm border-0 mb-3">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <div>
+            <strong>{{ record.inmate.inmate_number }} — {{ record.inmate.full_name }}</strong>
+            <span class="text-muted">· {{ record.record_type or 'Medical record' }} · {{ record.record_date }}</span>
+        </div>
+        <span class="badge bg-warning text-dark">Pending</span>
+    </div>
+    <div class="card-body">
+        <div class="small text-muted mb-2">
+            Submitted by {{ record.author.full_name if record.author else '—' }}
+            {% if record.attending_medical_officer %}· {{ record.attending_medical_officer }}{% endif %}
+        </div>
+        {% if record.complaint %}<p><strong>Complaint:</strong> {{ record.complaint }}</p>{% endif %}
+        {% if record.diagnosis %}<p><strong>Diagnosis:</strong> {{ record.diagnosis }}</p>{% endif %}
+        {% if record.treatment_prescribed %}<p><strong>Treatment:</strong> {{ record.treatment_prescribed }}</p>{% endif %}
+        {% if record.medication_details %}<p><strong>Medication:</strong> {{ record.medication_details }}</p>{% endif %}
+        {% if record.notes %}<p>{{ record.notes }}</p>{% endif %}
+        {% if record.attachment_path %}
+        <a class="btn btn-sm btn-outline-primary mb-3"
+           href="{{ url_for('medical_records.download', inmate_id=record.inmate_id, record_id=record.record_id) }}">
+            <i class="bi bi-paperclip"></i> {{ record.attachment_name or 'View attachment' }}
+        </a>
+        {% endif %}
+        {% for attachment in record.attachments %}
+        <a class="btn btn-sm btn-outline-primary mb-3"
+           href="{{ url_for('medical_records.download_attachment', inmate_id=record.inmate_id, record_id=record.record_id, attachment_id=attachment.attachment_id) }}">
+            <i class="bi bi-paperclip"></i> {{ attachment.original_name }}
+        </a>
+        {% endfor %}
+        <div>
+            <form method="POST" action="{{ url_for('medical_records.approve', record_id=record.record_id) }}"
+                  class="d-inline-block me-2">
+                <input type="text" name="notes" class="form-control form-control-sm d-inline-block"
+                       style="max-width: 260px" maxlength="500" placeholder="Optional approval note">
+                <button class="btn btn-sm btn-success mt-2">
+                    <i class="bi bi-check2"></i> Approve
+                </button>
+            </form>
+            <form method="POST" action="{{ url_for('medical_records.reject', record_id=record.record_id) }}"
+                  class="d-inline-block">
+                <input type="text" name="notes" class="form-control form-control-sm d-inline-block"
+                       style="max-width: 260px" maxlength="500" required placeholder="Reason for rejection">
+                <button class="btn btn-sm btn-outline-danger mt-2">
+                    <i class="bi bi-x"></i> Reject
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+{% else %}
+<div class="alert alert-success">There are no medical records awaiting approval.</div>
+{% endfor %}
+
+{% if pagination.pages > 1 %}
+<nav>
+    <ul class="pagination justify-content-center">
+        {% for page in pagination.iter_pages() %}
+        {% if page %}
+        <li class="page-item {{ 'active' if page == pagination.page }}">
+            <a class="page-link" href="{{ url_for('medical_records.pending', page=page) }}">{{ page }}</a>
+        </li>
+        {% else %}
+        <li class="page-item disabled"><span class="page-link">…</span></li>
+        {% endif %}
+        {% endfor %}
+    </ul>
+</nav>
+{% endif %}
+{% endblock %}

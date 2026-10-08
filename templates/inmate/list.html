@@ -4,10 +4,31 @@
 {% block inmate_content %}
 <div class="d-flex justify-content-between align-items-center mb-3">
     <h3 class="mb-0"><i class="bi bi-people-fill"></i> Inmate Records</h3>
-    <a href="{{ url_for('inmate.intake_scan') }}" class="btn btn-primary">
-        <i class="bi bi-fingerprint"></i> New Intake
-    </a>
+    <div class="d-flex gap-2">
+        {% if current_user.role_name in ['System Administrator', 'Warden'] %}
+        <div class="btn-group">
+            <button class="btn btn-outline-success dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+                <i class="bi bi-download"></i> Export matching records
+            </button>
+            <ul class="dropdown-menu dropdown-menu-end">
+                {% for fmt in ['csv', 'xlsx', 'pdf'] %}
+                <li><a class="dropdown-item" href="{{ url_for('exports.inmates', file_format=fmt, q=search, status=status) }}">{{ fmt|upper }}</a></li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+        {% if has_permission(Permissions.INMATE_CREATE) %}
+        <a href="{{ url_for('inmate.intake_scan') }}" class="btn btn-primary">
+            <i class="bi bi-fingerprint"></i> New Intake
+        </a>
+        {% endif %}
+    </div>
 </div>
+{% if current_user.role_name in ['System Administrator', 'Warden'] %}
+<div class="small text-muted mb-3">
+    Exports include all records matching the filters, across every page. Fingerprint data and medical details are excluded.
+</div>
+{% endif %}
 
 <form method="GET" class="row g-2 mb-3">
     <div class="col-md-6">

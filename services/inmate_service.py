@@ -3,12 +3,13 @@
 Inmate business logic: create new, re-admit, list, search, detail.
 """
 import base64
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from sqlalchemy import or_, func
 from extensions import db
 from models.cell import CellBlock
 from models.inmate import Inmate, AdmissionEpisode
 from models.audit import AuditEvent
+from services.medical_record_service import MedicalRecordService
 
 
 class InmateService:
@@ -141,6 +142,7 @@ class InmateService:
             next_of_kin_relationship=data.get('next_of_kin_relationship'),
             next_of_kin_phone=data.get('next_of_kin_phone'),
             next_of_kin_address=data.get('next_of_kin_address'),
+            photo_path=data.get('photo_path'),
             height_cm=_to_int(data.get('height_cm')),
             weight_kg=_to_int(data.get('weight_kg')),
             crime_category=data.get('crime_category'),
@@ -171,7 +173,7 @@ class InmateService:
             try:
                 inmate.fingerprint_template = _to_bytes(fingerprint_template)
                 inmate.biometric_enrolled = True
-                inmate.biometric_enrollment_date = datetime.utcnow()
+                inmate.biometric_enrollment_date = datetime.now(timezone.utc).replace(tzinfo=None)
                 inmate.biometric_quality_score = fingerprint_quality or 0
             except Exception as e:
                 return None, f'Invalid fingerprint template: {e}'
@@ -188,6 +190,13 @@ class InmateService:
             is_current=True,
         )
         db.session.add(episode)
+        MedicalRecordService.add_prior_records(
+            actor,
+            inmate,
+            summary=data.get('prior_medical_summary'),
+            attachment_path=data.get('prior_medical_document_path'),
+            attachment_name=data.get('prior_medical_document_name'),
+        )
         db.session.commit()
 
         InmateService._audit(
@@ -199,10 +208,18 @@ class InmateService:
 
     # ---------- Re-admit existing inmate ----------
     @staticmethod
-    def readmit_inmate(actor, inmate_id, data: dict):
+    def readmit_inmate(actor, inmate_id, data: dict, fingerprint_template=None,
+                       fingerprint_quality=None):
         inmate = Inmate.query.get(inmate_id)
         if not inmate:
             return None, 'Inmate not found.'
+
+        enrolled_template = None
+        if fingerprint_template:
+            try:
+                enrolled_template = _to_bytes(fingerprint_template)
+            except (TypeError, ValueError) as error:
+                return None, f'Invalid fingerprint template: {error}'
 
         security_classification = (
             data.get('security_classification')
@@ -225,7 +242,7 @@ class InmateService:
             'sentence_type', 'sentence_duration', 'cell_number',
             'security_classification', 'next_of_kin_name',
             'next_of_kin_relationship', 'next_of_kin_phone',
-            'next_of_kin_address', 'medical_alert',
+            'next_of_kin_address', 'medical_alert', 'photo_path',
         ]
         changes = []
         if 'cell_block' in data:
@@ -244,6 +261,13 @@ class InmateService:
                     changes.append(f'{f}: "{old}" -> "{new}"')
                     setattr(inmate, f, new)
 
+        if enrolled_template:
+            inmate.fingerprint_template = enrolled_template
+            inmate.biometric_enrolled = True
+            inmate.biometric_enrollment_date = datetime.now(timezone.utc).replace(tzinfo=None)
+            inmate.biometric_quality_score = fingerprint_quality or 0
+            changes.append('fingerprint: enrolled')
+
         if data.get('expected_release_date'):
             try:
                 inmate.expected_release_date = datetime.strptime(
@@ -261,6 +285,13 @@ class InmateService:
             is_current=True,
         )
         db.session.add(episode)
+        MedicalRecordService.add_prior_records(
+            actor,
+            inmate,
+            summary=data.get('prior_medical_summary'),
+            attachment_path=data.get('prior_medical_document_path'),
+            attachment_name=data.get('prior_medical_document_name'),
+        )
 
         inmate.status = 'Active'
         inmate.current_admission_date = date.today()

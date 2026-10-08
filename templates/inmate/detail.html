@@ -1,22 +1,46 @@
 {% extends "inmate/_layout.html" %}
 {% block title %}{{ inmate.full_name }} — Luzira PMS{% endblock %}
 
+{% block page_styles %}
+<style>
+    @media print {
+        nav, footer, .d-print-none, .row > .col-md-3.mb-3 { display: none !important; }
+        .row > .col-md-9.col-lg-10 { width: 100% !important; }
+        body { background: #fff !important; }
+        .card { box-shadow: none !important; }
+    }
+</style>
+{% endblock %}
+
 {% block inmate_content %}
-<div class="d-flex justify-content-between align-items-center mb-3">
+<div class="d-flex justify-content-between align-items-center mb-3 d-print-none">
     <h3 class="mb-0">
         <i class="bi bi-person-badge"></i>
         {{ inmate.full_name }}
         <code class="text-muted fs-6">{{ inmate.inmate_number }}</code>
     </h3>
         <div class="d-flex gap-2">
+        {% if has_permission(Permissions.INMATE_EDIT_REQUEST) %}
         <a href="{{ url_for('edit_requests.inmate_edit', inmate_id=inmate.inmate_id) }}"
            class="btn btn-warning btn-sm">
             <i class="bi bi-pencil-square"></i> Request Edit
         </a>
+        {% endif %}
+        {% if has_permission(Permissions.MEDICAL_RECORD_CREATE) %}
+        <a href="{{ url_for('medical_records.new_for_inmate', inmate_id=inmate.inmate_id) }}"
+           class="btn btn-outline-danger btn-sm">
+            <i class="bi bi-heart-pulse"></i> Add Medical Record
+        </a>
+        {% endif %}
+        {% if has_permission(Permissions.INMATE_CREATE) %}
         <a href="{{ url_for('inmate.readmit', inmate_id=inmate.inmate_id) }}"
            class="btn btn-success btn-sm">
             <i class="bi bi-arrow-repeat"></i> Re-admit
         </a>
+        {% endif %}
+        <button type="button" class="btn btn-outline-primary btn-sm" onclick="window.print()">
+            <i class="bi bi-printer"></i> Print / Preview
+        </button>
         <a href="{{ url_for('inmate.list_inmates') }}" class="btn btn-outline-secondary btn-sm">
             <i class="bi bi-arrow-left"></i> Back
         </a>
@@ -91,11 +115,89 @@
                 </table>
             </div>
         </div>
-    </div>
+
+        {% if has_permission(Permissions.MEDICAL_RECORD_VIEW) %}
+        <div class="card shadow-sm border-0 mt-3">
+                <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+                    <span><i class="bi bi-heart-pulse"></i> Medical Records</span>
+                    {% if has_permission(Permissions.MEDICAL_RECORD_CREATE) %}
+                    <a href="{{ url_for('medical_records.new_for_inmate', inmate_id=inmate.inmate_id) }}"
+                       class="btn btn-sm btn-light">Add record</a>
+                    {% endif %}
+                </div>
+                <div class="card-body">
+                    {% for record in medical_records %}
+                    <div class="border rounded p-3 mb-3">
+                        <div class="d-flex justify-content-between align-items-start gap-2">
+                            <div>
+                                <strong>{{ record.record_type or 'Medical record' }}</strong>
+                                <div class="small text-muted">
+                                    {{ record.record_date }}
+                                    {% if record.attending_medical_officer %} · {{ record.attending_medical_officer }}{% endif %}
+                                </div>
+                            </div>
+                            <span class="badge
+                                {% if record.approval_status == 'Approved' %}bg-success
+                                {% elif record.approval_status == 'Pending' %}bg-warning text-dark
+                                {% else %}bg-secondary{% endif %}">
+                                {{ record.approval_status }}
+                            </span>
+                        </div>
+                        {% if record.complaint %}<div class="mt-2"><strong>Complaint:</strong> {{ record.complaint }}</div>{% endif %}
+                        {% if record.diagnosis %}<div><strong>Diagnosis:</strong> {{ record.diagnosis }}</div>{% endif %}
+                        {% if record.treatment_prescribed %}<div><strong>Treatment:</strong> {{ record.treatment_prescribed }}</div>{% endif %}
+                        {% if record.medication_details %}<div><strong>Medication:</strong> {{ record.medication_details }}</div>{% endif %}
+                        {% if record.notes %}<div class="mt-2">{{ record.notes }}</div>{% endif %}
+                        {% if record.attachment_path %}
+                        <a class="btn btn-sm btn-outline-primary mt-2"
+                           href="{{ url_for('medical_records.download', inmate_id=inmate.inmate_id, record_id=record.record_id) }}">
+                            <i class="bi bi-paperclip"></i> {{ record.attachment_name or 'View attachment' }}
+                        </a>
+                        {% endif %}
+                        {% for attachment in record.attachments %}
+                        <a class="btn btn-sm btn-outline-primary mt-2"
+                           href="{{ url_for('medical_records.download_attachment', inmate_id=inmate.inmate_id, record_id=record.record_id, attachment_id=attachment.attachment_id) }}">
+                            <i class="bi bi-paperclip"></i> {{ attachment.original_name }}
+                        </a>
+                        {% endfor %}
+
+                        {% if has_permission(Permissions.MEDICAL_RECORD_CREATE) %}
+                        <form action="{{ url_for('medical_records.add_attachments', inmate_id=inmate.inmate_id, record_id=record.record_id) }}"
+                              method="post" enctype="multipart/form-data" class="mt-2">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <div class="input-group input-group-sm">
+                                <input type="file" name="attachments" multiple class="form-control form-control-sm" />
+                                <button class="btn btn-sm btn-outline-secondary" type="submit">Add</button>
+                            </div>
+                            <div class="small text-muted">Add more files to this record. New files may require admin approval.</div>
+                        </form>
+                        {% endif %}
+
+                        {% if record.review_notes %}
+                        <div class="small text-muted mt-2">Review: {{ record.review_notes }}</div>
+                        {% endif %}
+                    </div>
+                    {% else %}
+                    <p class="text-muted mb-0">No medical records have been added.</p>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
 
     <div class="col-md-4">
         <div class="card shadow-sm border-0 mb-3">
             <div class="card-body text-center">
+                {% if inmate.photo_path %}
+                <img src="{{ url_for('inmate.photo', inmate_id=inmate.inmate_id, filename=inmate.photo_path) }}"
+                     class="person-photo-detail mb-3" alt="Photo of {{ inmate.full_name }}">
+                {% else %}
+                <div class="person-photo-detail person-photo-detail-placeholder mb-3"
+                     aria-label="No inmate photo available">
+                    <i class="bi bi-person-bounding-box"></i>
+                    <span>No photo</span>
+                </div>
+                {% endif %}
                 <i class="bi bi-fingerprint {{ 'text-success' if inmate.biometric_enrolled else 'text-muted' }}"
                    style="font-size: 4rem;"></i>
                 <h6 class="mt-2">

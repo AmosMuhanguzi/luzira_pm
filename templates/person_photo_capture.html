@@ -1,0 +1,27 @@
+<div class="card shadow-sm border-0 mb-3" data-photo-capture>
+    <div class="card-header bg-dark text-white">
+        <i class="bi bi-camera"></i> Person photo
+    </div>
+    <div class="card-body">
+        <input type="hidden" name="photo_data" value="{{ data.photo_data or '' }}"
+               data-photo-value>
+        <div class="person-photo-capture-preview mb-3">
+            <div class="person-photo-capture-placeholder" data-photo-placeholder>
+                <i class="bi bi-person-bounding-box"></i>
+                <span>Photo preview</span>
+            </div>
+            <video class="person-photo-capture-video d-none" data-photo-video
+                   autoplay playsinline muted></video>
+            <img class="person-photo-capture-image d-none" data-photo-image
+                 alt="Captured person photo">
+        </div>
+        <div class="d-flex flex-wrap align-items-center gap-2">
+            <button class="btn btn-outline-primary" type="button" data-photo-button>
+                <i class="bi bi-camera-fill"></i> Take photo
+            </button>
+            <span class="small text-muted" data-photo-status aria-live="polite">
+                Camera capture is optional. Allow camera access when prompted.
+            </span>
+        </div>
+    </div>
+</div>

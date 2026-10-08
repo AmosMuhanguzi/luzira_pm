@@ -1,0 +1,25 @@
+<div class="card shadow-sm border-0 mb-3" data-fingerprint-enrollment
+     data-enroll-url="{{ enrollment_url }}"
+     data-enrollment-id="{{ enrollment_id }}">
+    <input type="hidden" name="enrollment_id" value="{{ enrollment_id }}">
+    <div class="card-header bg-dark text-white">
+        <i class="bi bi-fingerprint"></i> Fingerprint enrollment
+    </div>
+    <div class="card-body">
+        <div class="d-flex flex-wrap align-items-center gap-3">
+            <button class="btn {{ 'btn-success' if has_probe else 'btn-outline-primary' }}"
+                    type="button" data-enroll-button>
+                <i class="bi {{ 'bi-check-circle' if has_probe else 'bi-fingerprint' }}"></i>
+                {{ 'Scan again' if has_probe else 'Scan fingerprint' }}
+            </button>
+            <span class="small {{ 'text-success' if has_probe else 'text-muted' }}"
+                  data-enroll-status aria-live="polite">
+                {% if has_probe %}
+                    Fingerprint captured. Submit the form to save enrollment.
+                {% else %}
+                    Scan after entering the person's details. The fingerprint will only be saved after a successful scan.
+                {% endif %}
+            </span>
+        </div>
+    </div>
+</div>

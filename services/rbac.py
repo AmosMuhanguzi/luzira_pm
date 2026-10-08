@@ -1,7 +1,7 @@
 # services/rbac.py
 """
 Role-Based Access Control.
-Defines all permissions and maps them to the five system roles.
+Defines all permissions and maps them to the system roles.
 """
 from functools import wraps
 from flask import abort, jsonify, request
@@ -17,6 +17,9 @@ class Permissions:
     INMATE_RELEASE           = 'inmate:release'
     INMATE_BIOMETRIC_ENROLL  = 'inmate:biometric_enroll'
     INMATE_BIOMETRIC_VERIFY  = 'inmate:biometric_verify'
+    MEDICAL_RECORD_VIEW      = 'medical_record:view'
+    MEDICAL_RECORD_CREATE    = 'medical_record:create'
+    MEDICAL_RECORD_APPROVE   = 'medical_record:approve'
 
         # Inmate — request edit via approval workflow
     INMATE_EDIT_REQUEST = 'inmate:edit_request'
@@ -77,6 +80,8 @@ ROLE_PERMISSIONS = {
         Permissions.SYSTEM_SETTINGS, Permissions.SYSTEM_AUDIT_LOG,
         Permissions.SYSTEM_BACKUP, Permissions.SYSTEM_MAINTENANCE,
         Permissions.INMATE_EDIT_REQUEST, Permissions.INMATE_EDIT_APPROVE,
+        Permissions.MEDICAL_RECORD_VIEW, Permissions.MEDICAL_RECORD_CREATE,
+        Permissions.MEDICAL_RECORD_APPROVE,
     ],
     'Warden': [
         Permissions.INMATE_VIEW,
@@ -110,6 +115,10 @@ ROLE_PERMISSIONS = {
         Permissions.VISIT_VIEW, Permissions.VISIT_APPROVE, Permissions.VISIT_DENY,
         Permissions.AI_VIEW_ALERTS,
         Permissions.INMATE_EDIT_REQUEST,
+    ],
+    'Medical Officer': [
+        Permissions.INMATE_VIEW,
+        Permissions.MEDICAL_RECORD_VIEW, Permissions.MEDICAL_RECORD_CREATE,
     ],
 }
 

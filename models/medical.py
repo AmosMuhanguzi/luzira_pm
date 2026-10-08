@@ -23,11 +23,44 @@ class MedicalRecord(BaseModel):
     notes                     = db.Column(db.Text)
 
     recorded_by = db.Column(db.Integer, db.ForeignKey('user_accounts.user_id'))
+    attachment_path = db.Column(db.String(255))
+    attachment_name = db.Column(db.String(255))
+    approval_status = db.Column(db.String(20), nullable=False, default='Approved', index=True)
+    reviewed_by = db.Column(db.Integer, db.ForeignKey('user_accounts.user_id'))
+    reviewed_at = db.Column(db.DateTime)
+    review_notes = db.Column(db.Text)
 
     inmate = db.relationship('Inmate', back_populates='medical_records')
+    author = db.relationship('UserAccount', foreign_keys=[recorded_by])
+    reviewer = db.relationship('UserAccount', foreign_keys=[reviewed_by])
+    attachments = db.relationship(
+        'MedicalRecordAttachment',
+        back_populates='medical_record',
+        cascade='all, delete-orphan',
+        lazy='select',
+    )
 
     def __repr__(self):
         return f'<MedicalRecord {self.record_id} inmate={self.inmate_id}>'
+
+
+class MedicalRecordAttachment(BaseModel):
+    __tablename__ = 'medical_record_attachments'
+
+    attachment_id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    medical_record_id = db.Column(
+        db.Integer,
+        db.ForeignKey('medical_records.record_id', ondelete='CASCADE'),
+        nullable=False,
+        index=True,
+    )
+    file_path = db.Column(db.String(255), nullable=False)
+    original_name = db.Column(db.String(255), nullable=False)
+
+    medical_record = db.relationship('MedicalRecord', back_populates='attachments')
+
+    def __repr__(self):
+        return f'<MedicalRecordAttachment {self.attachment_id}>'
 
 
 class DisciplinaryLog(BaseModel):

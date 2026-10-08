@@ -55,11 +55,17 @@ def create_app(config_name=None):
     from routes.inmate import inmate_bp          
     app.register_blueprint(inmate_bp)  
 
+    from routes.medical_records import medical_records_bp
+    app.register_blueprint(medical_records_bp)
+
     from routes.edit_requests import edit_bp        
     app.register_blueprint(edit_bp) 
 
     from routes.visitor import visitor_bp       
     app.register_blueprint(visitor_bp)  
+
+    from routes.exports import exports_bp
+    app.register_blueprint(exports_bp)
 
     from routes.ai import ai_bp                    
     app.register_blueprint(ai_bp)
@@ -86,10 +92,12 @@ def create_app(config_name=None):
     # ---- Jinja helpers ----
     from services.rbac import has_permission, Permissions
     from services.edit_request_service import EditRequestService
+    from services.medical_record_service import MedicalRecordService
 
     app.jinja_env.globals['has_permission'] = has_permission
     app.jinja_env.globals['Permissions'] = Permissions
     app.jinja_env.globals['pending_edit_count'] = EditRequestService.pending_count
+    app.jinja_env.globals['pending_medical_record_count'] = MedicalRecordService.pending_count
 
     # ---- Health check ----
     @app.route('/health')

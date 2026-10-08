@@ -22,6 +22,7 @@ def seed():
             ('Records Officer',      'Inmate records management'),
             ('Receptionist',         'Intake processing and visitor management'),
             ('Security Officer',     'Visitor verification and gate security'),
+            ('Medical Officer',      'View inmate records and submit medical records for approval'),
         ]
         roles = {}
         for name, desc in roles_data:

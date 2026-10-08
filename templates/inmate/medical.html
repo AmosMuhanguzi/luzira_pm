@@ -1,0 +1,80 @@
+{% extends "inmate/_layout.html" %}
+{% block title %}Add Medical Record — Luzira PMS{% endblock %}
+
+{% block inmate_content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h3 class="mb-0"><i class="bi bi-heart-pulse"></i> Add Medical Record</h3>
+    <a href="{{ url_for('inmate.detail', inmate_id=inmate.inmate_id) }}"
+       class="btn btn-outline-secondary btn-sm">Back to inmate</a>
+</div>
+
+<div class="alert alert-info">
+    Submissions are held for administrator approval before being added to the inmate's approved medical history.
+</div>
+
+<div class="card shadow-sm border-0">
+    <div class="card-header bg-dark text-white">
+        {{ inmate.full_name }} <code>{{ inmate.inmate_number }}</code>
+    </div>
+    <div class="card-body">
+        <form method="POST" enctype="multipart/form-data">
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <label class="form-label">Record date *</label>
+                    <input type="date" name="record_date" class="form-control" required
+                           value="{{ data.get('record_date', record_date) }}">
+                </div>
+                <div class="col-md-8">
+                    <label class="form-label">Record type</label>
+                    <input type="text" name="record_type" class="form-control" maxlength="50"
+                           placeholder="e.g. Consultation, Follow-up, Medication"
+                           value="{{ data.get('record_type', '') }}">
+                </div>
+                <div class="col-12">
+                    <label class="form-label">Complaint / reason for visit</label>
+                    <textarea name="complaint" class="form-control" rows="2">{{ data.get('complaint', '') }}</textarea>
+                </div>
+                <div class="col-12">
+                    <label class="form-label">Diagnosis</label>
+                    <textarea name="diagnosis" class="form-control" rows="2">{{ data.get('diagnosis', '') }}</textarea>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Treatment prescribed</label>
+                    <textarea name="treatment_prescribed" class="form-control" rows="2">{{ data.get('treatment_prescribed', '') }}</textarea>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Medication details</label>
+                    <textarea name="medication_details" class="form-control" rows="2">{{ data.get('medication_details', '') }}</textarea>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Referral hospital</label>
+                    <input type="text" name="hospital_name" class="form-control" maxlength="150"
+                           value="{{ data.get('hospital_name', '') }}">
+                    <div class="form-check mt-2">
+                        <input type="checkbox" name="referred_to_hospital" class="form-check-input"
+                               id="referredToHospital" {{ 'checked' if data.get('referred_to_hospital') }}>
+                        <label class="form-check-label" for="referredToHospital">Referred to hospital</label>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Attach medical documents</label>
+                    <input type="file" name="attachments" class="form-control"
+                           accept=".pdf,.jpg,.jpeg,.png" multiple>
+                    <div class="form-text">Select up to 10 PDF, JPG, or PNG files; each file may be up to 10 MB.</div>
+                </div>
+                <div class="col-12">
+                    <label class="form-label">Additional notes</label>
+                    <textarea name="notes" class="form-control" rows="3">{{ data.get('notes', '') }}</textarea>
+                </div>
+            </div>
+            <div class="d-flex justify-content-end gap-2 mt-4">
+                <a href="{{ url_for('inmate.detail', inmate_id=inmate.inmate_id) }}"
+                   class="btn btn-outline-secondary">Cancel</a>
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-send-check"></i> Submit for approval
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

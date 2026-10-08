@@ -35,6 +35,13 @@
                         <span class="badge rounded-pill bg-danger ms-1">{{ pc }}</span>
                     {% endif %}
                 </a>
+                <a href="{{ url_for('medical_records.pending') }}" class="btn btn-sm btn-outline-danger position-relative">
+                    <i class="bi bi-heart-pulse"></i> Medical Approvals
+                    {% set mc = pending_medical_record_count() %}
+                    {% if mc > 0 %}
+                        <span class="badge rounded-pill bg-danger ms-1">{{ mc }}</span>
+                    {% endif %}
+                </a>
                 <a href="{{ url_for('inmate.intake_scan') }}" class="btn btn-sm btn-outline-warning"><i class="bi bi-fingerprint"></i> Intake</a>
                 <a href="{{ url_for('inmate.list_inmates') }}" class="btn btn-sm btn-outline-info"><i class="bi bi-person-vcard"></i> Inmates</a>
                 <a href="{{ url_for('visitor.scan') }}" class="btn btn-sm btn-outline-success"><i class="bi bi-person-check"></i> Visitors</a>
@@ -57,11 +64,27 @@
             {% elif role == 'Security Officer' %}
                 <a href="{{ url_for('edit_requests.my_requests') }}" class="btn btn-sm btn-outline-warning"><i class="bi bi-send-check"></i> My Requests</a>
                 <a href="{{ url_for('visitor.scan') }}" class="btn btn-sm btn-outline-success"><i class="bi bi-person-check"></i> Visitor Check-in</a>
+
+            {% elif role == 'Medical Officer' %}
+                <a href="{{ url_for('inmate.list_inmates') }}" class="btn btn-sm btn-outline-primary"><i class="bi bi-person-vcard"></i> Inmate Records</a>
             {% endif %}
         </div>
     </div>
 </div>
 
+{% if role == 'Medical Officer' %}
+<div class="card border-0 shadow-sm">
+    <div class="card-body">
+        <h4><i class="bi bi-heart-pulse text-danger"></i> Medical Workspace</h4>
+        <p class="text-muted mb-3">
+            Review inmate records, add medical notes or documents, and track submissions awaiting administrator approval.
+        </p>
+        <a href="{{ url_for('inmate.list_inmates') }}" class="btn btn-primary">
+            <i class="bi bi-person-vcard"></i> Open Inmate Records
+        </a>
+    </div>
+</div>
+{% else %}
 <!-- REAL-TIME KPI METRICS BAR -->
 <div class="row g-3 mb-4">
     <div class="col-6 col-md-4 col-xl-2">
@@ -204,8 +227,10 @@
     Your role (<strong>{{ role }}</strong>) has no custom quick actions configured yet.
 </div>
 {% endif %}
+{% endif %}
 </div>
 
+{% if role != 'Medical Officer' %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
     // 1. Render Live Analytics Chart
@@ -269,4 +294,5 @@
         }
     }
 </script>
+{% endif %}
 {% endblock %}

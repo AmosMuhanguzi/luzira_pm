@@ -1,14 +1,28 @@
 {% extends "visitor/_layout.html" %}
 {% block title %}{{ visitor.full_name }} — Luzira PMS{% endblock %}
 
+{% block page_styles %}
+<style>
+    @media print {
+        nav, footer, .d-print-none, .row > .col-md-3.mb-3 { display: none !important; }
+        .row > .col-md-9.col-lg-10 { width: 100% !important; }
+        body { background: #fff !important; }
+        .card { box-shadow: none !important; }
+    }
+</style>
+{% endblock %}
+
 {% block visitor_content %}
-<div class="d-flex justify-content-between align-items-center mb-3">
+<div class="d-flex justify-content-between align-items-center mb-3 d-print-none">
     <h3 class="mb-0">
         <i class="bi bi-person-badge"></i>
         {{ visitor.full_name }}
         <code class="text-muted fs-6">{{ visitor.visitor_number or '' }}</code>
     </h3>
     <div class="d-flex gap-2">
+        <button type="button" class="btn btn-outline-primary btn-sm" onclick="window.print()">
+            <i class="bi bi-printer"></i> Print / Preview
+        </button>
         {% if not visitor.is_blacklisted %}
         <a href="{{ url_for('visitor.check_in', visitor_id=visitor.visitor_id) }}"
            class="btn btn-success btn-sm">
@@ -44,6 +58,16 @@
     <div class="col-md-4">
         <div class="card shadow-sm border-0 mb-3">
             <div class="card-body text-center">
+                {% if visitor.photo_path %}
+                <img src="{{ url_for('visitor.photo', visitor_id=visitor.visitor_id, filename=visitor.photo_path) }}"
+                     class="person-photo-detail mb-3" alt="Photo of {{ visitor.full_name }}">
+                {% else %}
+                <div class="person-photo-detail person-photo-detail-placeholder mb-3"
+                     aria-label="No visitor photo available">
+                    <i class="bi bi-person-bounding-box"></i>
+                    <span>No photo</span>
+                </div>
+                {% endif %}
                 <i class="bi bi-fingerprint {{ 'text-success' if visitor.biometric_enrolled else 'text-muted' }}"
                    style="font-size: 4rem;"></i>
                 <h6 class="mt-2">

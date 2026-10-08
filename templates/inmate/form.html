@@ -1,5 +1,6 @@
 {% extends "inmate/_layout.html" %}
 {% set editing = (mode == 'returning') %}
+{% set enrollment_url = url_for('inmate.api_enroll_fingerprint') %}
 {% block title %}{{ 'Re-admit Inmate' if editing else 'New Inmate' }} — Luzira PMS{% endblock %}
 
 {% block inmate_content %}
@@ -26,21 +27,10 @@
         Enrolled biometric: <strong>{{ 'Yes' if inmate.biometric_enrolled else 'No' }}</strong>
     </div>
 </div>
-{% else %}
-    {% if has_probe %}
-    <div class="alert alert-success">
-        <i class="bi bi-check-circle"></i> Fingerprint captured — will be enrolled on save.
-    </div>
-    {% else %}
-    <div class="alert alert-warning">
-        <i class="bi bi-exclamation-triangle"></i>
-        No fingerprint captured. <a href="{{ url_for('inmate.intake_scan') }}">Run a scan</a>
-        first, or continue to save without biometric.
-    </div>
-    {% endif %}
 {% endif %}
 
-<form method="POST" novalidate>
+<form method="POST" enctype="multipart/form-data" novalidate>
+    {% include 'person_photo_capture.html' %}
     <div class="card shadow-sm border-0 mb-3">
         <div class="card-header bg-dark text-white"><i class="bi bi-person"></i> Personal</div>
         <div class="card-body">
@@ -214,6 +204,14 @@
             </div>
             <label class="form-label">Medical alert / notes</label>
             <textarea name="medical_alert" class="form-control" rows="2">{{ data.medical_alert or (inmate.medical_alert if editing else '') }}</textarea>
+            <hr>
+            <label class="form-label">Existing medical records summary</label>
+            <textarea name="prior_medical_summary" class="form-control" rows="3"
+                      placeholder="Summarize any existing medical history or records provided at intake">{{ data.prior_medical_summary or '' }}</textarea>
+            <label class="form-label mt-3">Upload an existing medical record</label>
+            <input type="file" name="prior_medical_document" class="form-control"
+                   accept=".pdf,.jpg,.jpeg,.png">
+            <div class="form-text">PDF, JPG, or PNG; maximum 10 MB. Medical documents are stored privately.</div>
         </div>
     </div>
 
@@ -229,6 +227,7 @@
     </div>
     {% endif %}
 
+    {% include 'fingerprint_enrollment.html' with context %}
     <div class="d-flex justify-content-end gap-2 mb-4">
         <a href="{{ url_for('inmate.list_inmates') }}" class="btn btn-outline-secondary">Cancel</a>
         <button type="submit" class="btn btn-primary btn-lg">
@@ -237,6 +236,8 @@
         </button>
     </div>
 </form>
+<script src="{{ url_for('static', filename='js/person-photo-capture.js') }}"></script>
+<script src="{{ url_for('static', filename='js/fingerprint-enrollment.js') }}"></script>
 
 <script>
 const cellAssignmentUrl = {{ url_for('inmate.api_cell_assignment')|tojson }};

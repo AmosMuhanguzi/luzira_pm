@@ -1,10 +1,13 @@
 # routes/inmate.py
 import base64
+import os
+import secrets
 from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 from zoneinfo import ZoneInfo
 from flask import (Blueprint, render_template, redirect, url_for,
-                   flash, request, session, current_app, jsonify)
+                   flash, request, session, current_app, jsonify, abort,
+                   send_from_directory)
 from flask_login import login_required, current_user
 from flask_wtf import FlaskForm
 from wtforms import DecimalField, HiddenField, SelectField, SubmitField, TextAreaField
@@ -13,7 +16,7 @@ from sqlalchemy import or_
 
 from extensions import csrf, db
 from models.cell import CellBlock
-from services.rbac import require_permission, Permissions
+from services.rbac import require_permission, Permissions, has_permission
 from services.inmate_service import InmateService
 from services.inmate_matcher import InmateMatcher
 from services.biometric_agent_client import BiometricAgentClient, BiometricAgentError
@@ -22,6 +25,8 @@ from models.audit import AuditEvent
 from models.medical import DisciplinaryLog, MedicalRecord
 from models.user import UserAccount
 from services.biometric_matcher import compare_templates
+from services.person_photo_service import PersonPhotoService
+from services.medical_record_service import MedicalRecordService
 
 
 inmate_bp = Blueprint('inmate', __name__, url_prefix='/inmate')
@@ -454,9 +459,6 @@ def api_scan_identify():
 
     result = InmateMatcher.identify(probe_template, threshold=threshold)
 
-    session['pending_inmate_probe'] = probe_template
-    session['pending_inmate_probe_quality'] = probe.get('quality', 0)
-
     if result['match']:
         m = result['inmate']
         return jsonify({
@@ -485,6 +487,75 @@ def api_scan_identify():
     })
 
 
+@inmate_bp.route('/api/enroll-fingerprint', methods=['POST'])
+@login_required
+@require_permission(Permissions.INMATE_CREATE)
+def api_enroll_fingerprint():
+    payload = request.get_json(silent=True) or {}
+    enrollment_id = payload.get('enrollment_id')
+    if not isinstance(enrollment_id, str) or not enrollment_id:
+        return jsonify({'ok': False, 'error': 'Reload the form before scanning.'}), 400
+    try:
+        if _mock_mode():
+            seed = (current_app.config.get('SECRET_KEY') or 'x') * 4
+            probe = {
+                'success': True,
+                'template': base64.b64encode((seed.encode() * 4)[:256]).decode('utf-8'),
+                'quality': 90,
+            }
+        else:
+            probe = _agent().enroll(
+                samples=current_app.config.get('BIOMETRIC_SAMPLES_PER_ENROLL', 3)
+            )
+    except BiometricAgentError as error:
+        pending = session.get('pending_inmate_enrollment') or {}
+        if pending.get('enrollment_id') == enrollment_id:
+            session.pop('pending_inmate_enrollment', None)
+        return jsonify({'ok': False, 'error': str(error)}), 503
+
+    if not probe.get('success') or not probe.get('template'):
+        pending = session.get('pending_inmate_enrollment') or {}
+        if pending.get('enrollment_id') == enrollment_id:
+            session.pop('pending_inmate_enrollment', None)
+        return jsonify({
+            'ok': False,
+            'error': probe.get('error', 'Fingerprint enrollment failed.'),
+        }), 400
+
+    try:
+        quality = float(probe['quality'])
+    except (KeyError, TypeError, ValueError):
+        pending = session.get('pending_inmate_enrollment') or {}
+        if pending.get('enrollment_id') == enrollment_id:
+            session.pop('pending_inmate_enrollment', None)
+        return jsonify({
+            'ok': False,
+            'error': 'The scanner did not report fingerprint quality. Try again.',
+        }), 400
+
+    quality_threshold = current_app.config.get('BIOMETRIC_QUALITY_MIN', 60)
+    if not 0 <= quality <= 100 or quality < quality_threshold:
+        pending = session.get('pending_inmate_enrollment') or {}
+        if pending.get('enrollment_id') == enrollment_id:
+            session.pop('pending_inmate_enrollment', None)
+        return jsonify({
+            'ok': False,
+            'error': f'Fingerprint quality is too low ({quality:g}%). Try again.',
+        }), 400
+
+    session['pending_inmate_enrollment'] = {
+        'enrollment_id': enrollment_id,
+        'template': probe['template'],
+        'quality': quality,
+    }
+    return jsonify({
+        'ok': True,
+        'quality': round(quality),
+        'samples_captured': probe.get('samples_captured', 1),
+        'message': 'Fingerprint captured. Submit the form to save enrollment.',
+    })
+
+
 # ---------- New inmate form ----------
 @inmate_bp.route('/new', methods=['GET', 'POST'])
 @login_required
@@ -492,8 +563,44 @@ def api_scan_identify():
 def new_intake():
     if request.method == 'POST':
         data = request.form.to_dict()
-        template = session.get('pending_inmate_probe')
-        quality  = session.get('pending_inmate_probe_quality', 0)
+        data['prior_medical_summary'] = request.form.get('prior_medical_summary', '')
+        document_path, document_name, document_error = MedicalRecordService.save_document(
+            request.files.get('prior_medical_document'),
+            inmate_id=0,
+        )
+        if document_error:
+            flash(document_error, 'danger')
+            return render_template(
+                'inmate/form.html', mode='new', data=data,
+                has_probe=False,
+                enrollment_id=data.get('enrollment_id') or secrets.token_urlsafe(24),
+                cell_blocks=InmateService.cell_block_options(),
+            )
+        photo_data = data.pop('photo_data', '')
+        data.pop('photo_path', None)
+        enrollment_id = data.get('enrollment_id')
+        data.pop('enrollment_id', None)
+        enrollment = session.get('pending_inmate_enrollment') or {}
+        if enrollment.get('enrollment_id') != enrollment_id:
+            enrollment = {}
+        template = enrollment.get('template')
+        quality = enrollment.get('quality', 0)
+
+        photo_path, photo_error = PersonPhotoService.save_capture(photo_data)
+        if photo_error:
+            MedicalRecordService.delete_document(document_path)
+            flash(photo_error, 'danger')
+            return render_template('inmate/form.html',
+                                   mode='new', data=data,
+                                   has_probe=bool(template),
+                                   enrollment_id=enrollment_id,
+                                   cell_blocks=InmateService.cell_block_options())
+        if photo_path:
+            data['photo_path'] = photo_path
+        if document_path:
+            data['prior_medical_document_path'] = document_path
+            data['prior_medical_document_name'] = document_name
+        data['photo_data'] = photo_data
 
         inmate, error = InmateService.create_inmate(
             actor=current_user, data=data,
@@ -501,20 +608,23 @@ def new_intake():
             fingerprint_quality=quality,
         )
         if error:
+            PersonPhotoService.delete_photo(photo_path)
+            MedicalRecordService.delete_document(document_path)
             flash(error, 'danger')
             return render_template('inmate/form.html',
                                    mode='new', data=data,
                                    has_probe=bool(template),
+                                   enrollment_id=enrollment_id,
                                    cell_blocks=InmateService.cell_block_options())
 
-        session.pop('pending_inmate_probe', None)
-        session.pop('pending_inmate_probe_quality', None)
+        if (session.get('pending_inmate_enrollment') or {}).get('enrollment_id') == enrollment_id:
+            session.pop('pending_inmate_enrollment', None)
         flash(f'Inmate {inmate.inmate_number} registered successfully.', 'success')
         return redirect(url_for('inmate.detail', inmate_id=inmate.inmate_id))
 
-    has_probe = 'pending_inmate_probe' in session
     return render_template('inmate/form.html',
-                           mode='new', data={}, has_probe=has_probe,
+                           mode='new', data={}, has_probe=False,
+                           enrollment_id=secrets.token_urlsafe(24),
                            cell_blocks=InmateService.cell_block_options())
 
 
@@ -549,24 +659,81 @@ def readmit(inmate_id):
 
     if request.method == 'POST':
         data = request.form.to_dict()
+        data['prior_medical_summary'] = request.form.get('prior_medical_summary', '')
+        document_path, document_name, document_error = MedicalRecordService.save_document(
+            request.files.get('prior_medical_document'),
+            inmate_id=inmate_id,
+        )
+        if document_error:
+            flash(document_error, 'danger')
+            return render_template('inmate/form.html',
+                                   mode='returning', inmate=inmate, data=data,
+                                   has_probe=False,
+                                   enrollment_id=data.get('enrollment_id') or secrets.token_urlsafe(24),
+                                   cell_blocks=InmateService.cell_block_options())
+        photo_data = data.pop('photo_data', '')
+        data.pop('photo_path', None)
+        enrollment_id = data.get('enrollment_id')
+        data.pop('enrollment_id', None)
+        enrollment = session.get('pending_inmate_enrollment') or {}
+        if enrollment.get('enrollment_id') != enrollment_id:
+            enrollment = {}
+        template = enrollment.get('template')
+        quality = enrollment.get('quality', 0)
+        photo_path, photo_error = PersonPhotoService.save_capture(photo_data)
+        if photo_error:
+            MedicalRecordService.delete_document(document_path)
+            flash(photo_error, 'danger')
+            return render_template('inmate/form.html',
+                                   mode='returning', inmate=inmate, data=data,
+                                   has_probe=bool(template),
+                                   enrollment_id=enrollment_id,
+                                   cell_blocks=InmateService.cell_block_options())
+        if photo_path:
+            data['photo_path'] = photo_path
+        if document_path:
+            data['prior_medical_document_path'] = document_path
+            data['prior_medical_document_name'] = document_name
+        data['photo_data'] = photo_data
+
         updated, error = InmateService.readmit_inmate(
-            actor=current_user, inmate_id=inmate_id, data=data
+            actor=current_user, inmate_id=inmate_id, data=data,
+            fingerprint_template=template, fingerprint_quality=quality,
         )
         if error:
+            PersonPhotoService.delete_photo(photo_path)
+            MedicalRecordService.delete_document(document_path)
             flash(error, 'danger')
             return render_template('inmate/form.html',
                                    mode='returning', inmate=inmate, data=data,
+                                   has_probe=bool(template),
+                                   enrollment_id=enrollment_id,
                                    cell_blocks=InmateService.cell_block_options())
 
-        session.pop('pending_inmate_probe', None)
-        session.pop('pending_inmate_probe_quality', None)
+        if (session.get('pending_inmate_enrollment') or {}).get('enrollment_id') == enrollment_id:
+            session.pop('pending_inmate_enrollment', None)
         flash(f'Inmate {updated.inmate_number} re-admitted '
               f'(admission #{updated.total_admissions}).', 'success')
         return redirect(url_for('inmate.detail', inmate_id=updated.inmate_id))
 
     return render_template('inmate/form.html',
-                           mode='returning', inmate=inmate, data={},
+                           mode='returning', inmate=inmate, data={}, has_probe=False,
+                           enrollment_id=secrets.token_urlsafe(24),
                            cell_blocks=InmateService.cell_block_options())
+
+
+@inmate_bp.route('/<int:inmate_id>/photo/<filename>')
+@login_required
+@require_permission(Permissions.INMATE_VIEW)
+def photo(inmate_id, filename):
+    inmate = InmateService.get(inmate_id)
+    if not inmate or inmate.photo_path != filename:
+        abort(404)
+    return send_from_directory(
+        os.path.join(current_app.instance_path, 'person_photos'),
+        filename,
+        mimetype='image/jpeg',
+    )
 
 
 # ---------- Detail ----------
@@ -587,10 +754,25 @@ def detail(inmate_id):
     ).all()
 
     pending_edits = EditRequestService.pending_for_inmate(inmate_id)
+    medical_records = MedicalRecord.query.filter(
+        MedicalRecord.inmate_id == inmate_id,
+        or_(
+            MedicalRecord.approval_status == 'Approved',
+            MedicalRecord.recorded_by == current_user.user_id,
+            MedicalRecord.approval_status == 'Pending',
+        ),
+    ).order_by(MedicalRecord.record_date.desc(), MedicalRecord.record_id.desc()).all()
+    if not has_permission(Permissions.MEDICAL_RECORD_APPROVE):
+        medical_records = [
+            record for record in medical_records
+            if record.approval_status == 'Approved'
+            or record.recorded_by == current_user.user_id
+        ]
 
     return render_template('inmate/detail.html',
                            inmate=inmate, episodes=episodes,
-                           pending_edits=pending_edits)
+                           pending_edits=pending_edits,
+                           medical_records=medical_records)
 
 @inmate_bp.route('/register', methods=['GET', 'POST'])
 def register_inmate():

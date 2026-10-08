@@ -8,7 +8,7 @@ from models.user import Role, UserAccount
 from models.inmate import Inmate, AdmissionEpisode
 from models.visitor import Visitor
 from models.visit import VisitLog
-from models.medical import MedicalRecord, DisciplinaryLog
+from models.medical import MedicalRecord, MedicalRecordAttachment, DisciplinaryLog
 from models.ai import AIAnalysisLog, VisitorPattern, PopulationForecast
 from models.audit import AuditEvent
 from models.notification import Notification, SystemSetting
@@ -19,7 +19,7 @@ __all__ = [
     'Role', 'UserAccount',
     'Inmate', 'AdmissionEpisode',
     'Visitor', 'VisitLog',
-    'MedicalRecord', 'DisciplinaryLog',
+    'MedicalRecord', 'MedicalRecordAttachment', 'DisciplinaryLog',
     'AIAnalysisLog', 'VisitorPattern', 'PopulationForecast',
     'AuditEvent',
     'Notification', 'SystemSetting',
