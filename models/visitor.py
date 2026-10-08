@@ -1,4 +1,6 @@
 # models/visitor.py
+from datetime import datetime
+
 from models.visit import VisitLog  # Re-export VisitLog
 from extensions import db
 from models.base import BaseModel
@@ -38,6 +40,13 @@ class Visitor(BaseModel):
 
     # Relationships
     visit_logs = db.relationship('VisitLog', back_populates='visitor', cascade='all, delete-orphan', lazy='dynamic')
+    blacklist_events = db.relationship(
+        'VisitorBlacklistEvent',
+        back_populates='visitor',
+        cascade='all, delete-orphan',
+        lazy='dynamic',
+        order_by='VisitorBlacklistEvent.event_at.desc()',
+    )
     
     # Use back_populates here to match VisitorPattern
     pattern = db.relationship('VisitorPattern', back_populates='visitor', uselist=False, cascade='all, delete-orphan')
@@ -83,6 +92,14 @@ class Visitor(BaseModel):
     def blacklist_reason(self):
         return self.flag_reason
 
+    @property
+    def blacklist_date(self):
+        latest_block = self.blacklist_events.filter_by(action='Blocked').order_by(
+            VisitorBlacklistEvent.event_at.desc(),
+            VisitorBlacklistEvent.event_id.desc(),
+        ).first()
+        return latest_block.event_at if latest_block else None
+
     def to_dict(self):
         return {
             'visitor_id': self.visitor_id,
@@ -124,3 +141,29 @@ class Visitor(BaseModel):
 
     def __repr__(self):
         return f'<Visitor {self.visitor_number or self.full_name} ({self.national_id_number or "No NIN"})>'
+
+
+class VisitorBlacklistEvent(BaseModel):
+    __tablename__ = 'visitor_blacklist_events'
+
+    event_id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    visitor_id = db.Column(
+        db.Integer,
+        db.ForeignKey('visitors.visitor_id', ondelete='CASCADE'),
+        nullable=False,
+        index=True,
+    )
+    action = db.Column(db.String(10), nullable=False, index=True)
+    reason = db.Column(db.Text, nullable=False)
+    recorded_by = db.Column(
+        db.Integer,
+        db.ForeignKey('user_accounts.user_id'),
+        nullable=True,
+    )
+    event_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, index=True)
+
+    visitor = db.relationship('Visitor', back_populates='blacklist_events')
+    actor = db.relationship('UserAccount', foreign_keys=[recorded_by])
+
+    def __repr__(self):
+        return f'<VisitorBlacklistEvent {self.action} visitor={self.visitor_id}>'

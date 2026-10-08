@@ -484,9 +484,92 @@
                     <dd class="col-6">{{ inmate.cell_block or '—' }} / {{ inmate.cell_number or '—' }}</dd>
                     <dt class="col-6">Total admissions</dt><dd class="col-6">{{ inmate.total_admissions }}</dd>
                     <dt class="col-6">Security</dt><dd class="col-6">{{ inmate.security_classification }}</dd>
+                    <dt class="col-6">Medical isolation</dt>
+                    <dd class="col-6">
+                        {% if inmate.medical_isolation_required %}
+                        <span class="badge bg-danger">Required</span>
+                        {% else %}
+                        <span class="badge bg-secondary">Not required</span>
+                        {% endif %}
+                    </dd>
                 </dl>
             </div>
         </div>
+        {% if has_permission(Permissions.MEDICAL_RECORD_CREATE) %}
+        <div class="card shadow-sm border-0 mt-3">
+            <div class="card-header bg-danger text-white">
+                <i class="bi bi-shield-plus"></i> Medical isolation
+            </div>
+            <div class="card-body">
+                {% if inmate.medical_isolation_required %}
+                <div class="alert alert-danger py-2">
+                    <strong>Isolation required.</strong>
+                    {% if has_permission(Permissions.MEDICAL_RECORD_VIEW) and inmate.medical_isolation_reason %}
+                    <div class="small mt-1">{{ inmate.medical_isolation_reason }}</div>
+                    {% endif %}
+                </div>
+                {% if inmate.status == 'Active' %}
+                <form method="POST"
+                      action="{{ url_for('inmate.update_medical_isolation', inmate_id=inmate.inmate_id) }}">
+                    {{ medical_isolation_form.csrf_token }}
+                    {{ medical_isolation_form.requires_isolation(value='false') }}
+                    <button type="submit" class="btn btn-outline-secondary btn-sm">
+                        Clear isolation requirement
+                    </button>
+                </form>
+                {% endif %}
+                {% else %}
+                <p class="text-muted small">
+                    Mark an active inmate for medical isolation and assign them to a
+                    medical-isolation unit with the same security classification.
+                </p>
+                {% if inmate.status == 'Active' %}
+                <form method="POST"
+                      action="{{ url_for('inmate.update_medical_isolation', inmate_id=inmate.inmate_id) }}">
+                    {{ medical_isolation_form.csrf_token }}
+                    {{ medical_isolation_form.requires_isolation(value='true') }}
+                    <div class="mb-2">
+                        <label class="form-label" for="isolation-cell-block">Medical-isolation unit</label>
+                        <select id="isolation-cell-block" name="cell_block" class="form-select form-select-sm" required>
+                            <option value="">Select a designated unit</option>
+                            {% for block in isolation_cell_blocks %}
+                            <option value="{{ block.name }}"
+                                    {{ 'selected' if inmate.cell_block == block.name }}>
+                                {{ block.name }} ({{ block.security_classification }},
+                                {{ block.occupancy }}/{{ block.capacity }})
+                            </option>
+                            {% endfor %}
+                        </select>
+                        {% if not isolation_cell_blocks %}
+                        <div class="form-text text-danger">
+                            No available medical-isolation unit matches this inmate's security classification.
+                        </div>
+                        {% endif %}
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label" for="isolation-cell-number">Cell number</label>
+                        <input id="isolation-cell-number" type="text" name="cell_number"
+                               class="form-control form-control-sm" maxlength="20"
+                               value="{{ inmate.cell_number or '' }}">
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label" for="isolation-reason">Clinical reason</label>
+                        <textarea id="isolation-reason" name="medical_isolation_reason"
+                                  class="form-control form-control-sm" rows="3"
+                                  maxlength="2000" required></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-danger btn-sm"
+                            {{ 'disabled' if not isolation_cell_blocks }}>
+                        Require isolation and move inmate
+                    </button>
+                </form>
+                {% else %}
+                <div class="small text-muted">Only active inmates can be placed in medical isolation.</div>
+                {% endif %}
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
     </div>
 </div>
 

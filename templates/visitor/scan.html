@@ -55,6 +55,14 @@
                         <tr><th>Match confidence</th><td id="mScore"></td></tr>
                     </table>
                     <div id="mWarning" class="alert alert-danger mt-2 mb-0" style="display:none;"></div>
+                    {% if has_permission(Permissions.VISITOR_BLACKLIST) %}
+                    <button id="blockVisitorBtn" type="button"
+                            class="btn btn-outline-danger btn-sm mt-3"
+                            data-bs-toggle="modal" data-bs-target="#scanBlacklistModal"
+                            style="display:none;">
+                        <i class="bi bi-slash-circle"></i> Block visitor
+                    </button>
+                    {% endif %}
                 </div>
             </div>
 
@@ -80,6 +88,37 @@
         </div>
     </div>
 </div>
+{% if has_permission(Permissions.VISITOR_BLACKLIST) %}
+<div class="modal fade" id="scanBlacklistModal" tabindex="-1"
+     aria-labelledby="scanBlacklistModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content text-start">
+            <form id="scanBlacklistForm" method="POST">
+                {{ blacklist_form.hidden_tag() }}
+                <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title" id="scanBlacklistModalLabel">Block identified visitor</h5>
+                    <button type="button" class="btn-close btn-close-white"
+                            data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <label class="form-label" for="scanBlacklistReason">Reason for blocking *</label>
+                    <textarea id="scanBlacklistReason" name="reason" class="form-control"
+                              rows="4" maxlength="2000" required
+                              placeholder="Describe the prohibited item or conduct (for example, a knife or drugs)."></textarea>
+                    <div id="scanBlacklistCount" class="form-text">
+                        The fourth blocking incident makes the blacklist permanent.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary"
+                            data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-danger">Confirm block</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endif %}
 {% endblock %}
 
 {% block scripts %}
@@ -137,6 +176,10 @@ function showResult(data) {
     const proceed = document.getElementById('proceedBtn');
     const proceedLabel = document.getElementById('proceedLabel');
     const warning = document.getElementById('mWarning');
+    const blockVisitorBtn = document.getElementById('blockVisitorBtn');
+    const blockVisitorForm = document.getElementById('scanBlacklistForm');
+    const blockVisitorReason = document.getElementById('scanBlacklistReason');
+    const blockVisitorCount = document.getElementById('scanBlacklistCount');
 
     document.getElementById('enrolledCount').textContent = data.enrolled_count;
 
@@ -152,9 +195,14 @@ function showResult(data) {
         document.getElementById('mVisits').textContent      = data.visitor.total_visits;
         document.getElementById('mScore').textContent       = data.score + '%';
 
+        const count = data.visitor.blacklist_incident_count || 0;
+        const threshold = data.visitor.blacklist_threshold;
         let block = false;
         if (data.visitor.is_blacklisted) {
-            warning.textContent = '⚠ This visitor is blacklisted. Entry must be denied.';
+            const permanentText = data.visitor.permanently_blacklisted
+                ? ' This blacklist is permanent.'
+                : '';
+            warning.textContent = `This visitor is blacklisted (${count} blocking incident(s)): ${data.visitor.blacklist_reason || 'No reason recorded.'} Entry must be denied.${permanentText}`;
             warning.style.display = 'block';
             block = true;
         } else if (data.visitor.anomaly_flag) {
@@ -166,6 +214,17 @@ function showResult(data) {
 
         proceed.href = data.redirect;
         proceedLabel.textContent = 'Continue to Check-in';
+        if (blockVisitorBtn) {
+            blockVisitorBtn.style.display = data.visitor.is_blacklisted ? 'none' : 'inline-block';
+            if (blockVisitorForm && data.block_url) {
+                blockVisitorForm.action = data.block_url;
+            }
+            if (blockVisitorReason) blockVisitorReason.value = '';
+            if (blockVisitorCount) {
+                blockVisitorCount.textContent =
+                    `Incident ${count + 1} of ${threshold}. The ${ordinal(threshold)} blocking incident makes the blacklist permanent.`;
+            }
+        }
         if (block) {
             proceed.classList.add('disabled');
             proceedLabel.textContent = 'Blocked — Do Not Admit';
@@ -186,6 +245,12 @@ function showResult(data) {
         if (newPersonBtn) newPersonBtn.style.display = 'none';
         if (mockMatchNote) mockMatchNote.style.display = 'none';
     }
+}
+
+function ordinal(value) {
+    const suffix = ['th', 'st', 'nd', 'rd'];
+    const remainder = value % 100;
+    return `${value}${suffix[(remainder - 20) % 10] || suffix[remainder] || suffix[0]}`;
 }
 
 function animateBar() {

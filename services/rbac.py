@@ -31,6 +31,7 @@ class Permissions:
     VISITOR_CREATE           = 'visitor:create'
     VISITOR_EDIT             = 'visitor:edit'
     VISITOR_BLACKLIST        = 'visitor:blacklist'
+    VISITOR_BLACKLIST_CLEAR  = 'visitor:blacklist_clear'
     VISITOR_BIOMETRIC_ENROLL = 'visitor:biometric_enroll'
     VISITOR_BIOMETRIC_VERIFY = 'visitor:biometric_verify'
 
@@ -72,7 +73,8 @@ ROLE_PERMISSIONS = {
         Permissions.INMATE_DELETE, Permissions.INMATE_RELEASE,
         Permissions.INMATE_BIOMETRIC_ENROLL, Permissions.INMATE_BIOMETRIC_VERIFY,
         Permissions.VISITOR_VIEW, Permissions.VISITOR_CREATE, Permissions.VISITOR_EDIT,
-        Permissions.VISITOR_BLACKLIST, Permissions.VISITOR_BIOMETRIC_ENROLL, Permissions.VISITOR_BIOMETRIC_VERIFY,
+        Permissions.VISITOR_BLACKLIST, Permissions.VISITOR_BLACKLIST_CLEAR,
+        Permissions.VISITOR_BIOMETRIC_ENROLL, Permissions.VISITOR_BIOMETRIC_VERIFY,
         Permissions.VISIT_VIEW, Permissions.VISIT_CREATE, Permissions.VISIT_APPROVE, Permissions.VISIT_DENY,
         Permissions.AI_VIEW_ALERTS, Permissions.AI_REVIEW_ALERTS, Permissions.AI_VIEW_DASHBOARD, Permissions.AI_EXPORT_REPORTS,
         Permissions.REPORT_VIEW, Permissions.REPORT_GENERATE, Permissions.REPORT_EXPORT,
@@ -94,15 +96,17 @@ ROLE_PERMISSIONS = {
         Permissions.REPORT_VIEW, Permissions.REPORT_GENERATE, Permissions.REPORT_EXPORT,
         Permissions.INMATE_EDIT_REQUEST,
         Permissions.DISCIPLINARY_CREATE,
+        Permissions.VISITOR_BLACKLIST,
     ],
     'Records Officer': [
-        Permissions.INMATE_VIEW, Permissions.INMATE_CREATE, Permissions.INMATE_EDIT,
+        Permissions.INMATE_VIEW, Permissions.INMATE_CREATE,
         Permissions.INMATE_RELEASE,
-        Permissions.VISITOR_VIEW,
-        Permissions.VISIT_VIEW,
-        Permissions.REPORT_VIEW, Permissions.REPORT_GENERATE,
+        Permissions.INMATE_BIOMETRIC_ENROLL, Permissions.INMATE_BIOMETRIC_VERIFY,
+        Permissions.VISITOR_VIEW, Permissions.VISITOR_CREATE, Permissions.VISITOR_EDIT,
+        Permissions.VISITOR_BIOMETRIC_ENROLL, Permissions.VISITOR_BIOMETRIC_VERIFY,
+        Permissions.VISIT_VIEW, Permissions.VISIT_CREATE,
         Permissions.INMATE_EDIT_REQUEST,
-        Permissions.DISCIPLINARY_CREATE,
+        Permissions.VISITOR_BLACKLIST,
     ],
     'Receptionist': [
         Permissions.INMATE_VIEW, Permissions.INMATE_CREATE,
@@ -112,6 +116,7 @@ ROLE_PERMISSIONS = {
         Permissions.VISITOR_BIOMETRIC_ENROLL, Permissions.VISITOR_BIOMETRIC_VERIFY,
         Permissions.VISIT_VIEW, Permissions.VISIT_CREATE,
         Permissions.INMATE_EDIT_REQUEST,
+        Permissions.VISITOR_BLACKLIST,
     ],
     'Security Officer': [
         Permissions.INMATE_VIEW,
@@ -121,6 +126,7 @@ ROLE_PERMISSIONS = {
         Permissions.AI_VIEW_ALERTS,
         Permissions.INMATE_EDIT_REQUEST,
         Permissions.DISCIPLINARY_CREATE,
+        Permissions.VISITOR_BLACKLIST,
     ],
     'Medical Officer': [
         Permissions.INMATE_VIEW,

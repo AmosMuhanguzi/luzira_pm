@@ -26,6 +26,20 @@
             <i class="bi bi-pencil-square"></i> Request Edit
         </a>
         {% endif %}
+        {% if has_permission(Permissions.VISITOR_BLACKLIST) and not visitor.is_blacklisted %}
+        <button type="button" class="btn btn-outline-danger btn-sm"
+                data-bs-toggle="modal" data-bs-target="#blacklistVisitorModal">
+            <i class="bi bi-slash-circle"></i> Block visitor
+        </button>
+        {% endif %}
+        {% if has_permission(Permissions.VISITOR_BLACKLIST_CLEAR)
+              and visitor.is_blacklisted
+              and blacklist_incident_count < permanent_blacklist_threshold %}
+        <button type="button" class="btn btn-outline-success btn-sm"
+                data-bs-toggle="modal" data-bs-target="#clearBlacklistModal">
+            <i class="bi bi-unlock"></i> Clear blacklist
+        </button>
+        {% endif %}
         <button type="button" class="btn btn-outline-primary btn-sm" onclick="window.print()">
             <i class="bi bi-printer"></i> Print / Preview
         </button>
@@ -46,7 +60,119 @@
 <div class="alert alert-danger">
     <i class="bi bi-slash-circle"></i>
     <strong>Blacklisted:</strong> {{ visitor.blacklist_reason or 'No reason given.' }}
-    (since {{ visitor.blacklist_date or '—' }})
+    <span class="d-block small mt-1">
+        Since {{ visitor.blacklist_date.strftime('%Y-%m-%d %H:%M') if visitor.blacklist_date else '—' }}
+        · Blocking incident {{ blacklist_incident_count }} of {{ permanent_blacklist_threshold }}
+        {% if blacklist_incident_count >= permanent_blacklist_threshold %}
+        · <strong>Permanent — cannot be cleared</strong>
+        {% else %}
+        · Only a System Administrator can clear this blacklist
+        {% endif %}
+    </span>
+</div>
+{% endif %}
+
+{% if blacklist_events %}
+<div class="card shadow-sm border-0 mt-3">
+    <div class="card-header bg-white">
+        <i class="bi bi-shield-exclamation text-danger"></i> Blacklist history
+        <span class="badge bg-danger ms-1">{{ blacklist_incident_count }} blocking incident(s)</span>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-sm table-hover align-middle mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>Date</th>
+                    <th>Action</th>
+                    <th>Reason</th>
+                    <th>Recorded by</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for event in blacklist_events %}
+                <tr>
+                    <td class="text-nowrap">{{ event.event_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                    <td>
+                        {% if event.action == 'Blocked' %}
+                        <span class="badge bg-danger">Blocked</span>
+                        {% else %}
+                        <span class="badge bg-success">Cleared</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ event.reason }}</td>
+                    <td>{{ event.actor.full_name if event.actor else 'System / legacy record' }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
+{% if has_permission(Permissions.VISITOR_BLACKLIST) and not visitor.is_blacklisted %}
+<div class="modal fade" id="blacklistVisitorModal" tabindex="-1"
+     aria-labelledby="blacklistVisitorModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="POST" action="{{ url_for('visitor.blacklist', visitor_id=visitor.visitor_id) }}">
+                {{ blacklist_form.hidden_tag() }}
+                <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title" id="blacklistVisitorModalLabel">Block {{ visitor.full_name }}</h5>
+                    <button type="button" class="btn-close btn-close-white"
+                            data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <label class="form-label" for="blacklist-reason">Reason for blocking *</label>
+                    <textarea id="blacklist-reason" name="reason" class="form-control"
+                              rows="4" maxlength="2000" required
+                              placeholder="Describe the prohibited item or conduct (for example, a knife or drugs)."></textarea>
+                    <div class="form-text">
+                        Incident {{ blacklist_incident_count + 1 }} of {{ permanent_blacklist_threshold }}.
+                        The fourth blocking incident makes the blacklist permanent.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary"
+                            data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-danger">
+                        <i class="bi bi-slash-circle"></i> Confirm block
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% if has_permission(Permissions.VISITOR_BLACKLIST_CLEAR)
+      and visitor.is_blacklisted
+      and blacklist_incident_count < permanent_blacklist_threshold %}
+<div class="modal fade" id="clearBlacklistModal" tabindex="-1"
+     aria-labelledby="clearBlacklistModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="POST"
+                  action="{{ url_for('visitor.clear_blacklist', visitor_id=visitor.visitor_id) }}">
+                {{ clear_blacklist_form.hidden_tag() }}
+                <div class="modal-header bg-success text-white">
+                    <h5 class="modal-title" id="clearBlacklistModalLabel">Clear visitor blacklist</h5>
+                    <button type="button" class="btn-close btn-close-white"
+                            data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Clearing this blacklist will allow this visitor to check in again.</p>
+                    <label class="form-label" for="clear-blacklist-reason">Reason for clearing *</label>
+                    <textarea id="clear-blacklist-reason" name="reason" class="form-control"
+                              rows="3" maxlength="2000" required></textarea>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary"
+                            data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-success">Clear blacklist</button>
+                </div>
+            </form>
+        </div>
+    </div>
 </div>
 {% endif %}
 

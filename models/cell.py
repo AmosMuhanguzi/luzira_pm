@@ -9,6 +9,7 @@ class CellBlock(db.Model):
     capacity = db.Column(db.Integer, default=100, nullable=False)
     current_occupancy = db.Column(db.Integer, default=0, nullable=False)
     security_classification = db.Column(db.String(20), nullable=True)
+    medical_isolation_unit = db.Column(db.Boolean, default=False, nullable=False)
 
     @staticmethod
     def generate_next_name():

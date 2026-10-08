@@ -10,7 +10,9 @@ from flask import (Blueprint, render_template, redirect, url_for,
                    send_from_directory)
 from flask_login import login_required, current_user
 from flask_wtf import FlaskForm
-from wtforms import DecimalField, HiddenField, SelectField, SubmitField, TextAreaField
+from wtforms import (
+    DecimalField, HiddenField, SelectField, StringField, SubmitField, TextAreaField,
+)
 from wtforms.validators import (
     DataRequired, InputRequired, Length, NumberRange, Optional,
 )
@@ -73,6 +75,16 @@ class InmateReleaseForm(FlaskForm):
         validators=[Optional(), Length(max=4000)],
     )
     submit = SubmitField('Record release')
+
+
+class InmateMedicalIsolationForm(FlaskForm):
+    requires_isolation = HiddenField()
+    cell_block = StringField(validators=[Optional(), Length(max=50)])
+    cell_number = StringField(validators=[Optional(), Length(max=20)])
+    medical_isolation_reason = TextAreaField(
+        validators=[Optional(), Length(max=2000)]
+    )
+    submit = SubmitField('Update medical isolation')
 
 
 def _agent():
@@ -541,6 +553,11 @@ def work_transfer_action(inmate_id, action):
     payload = request.get_json(silent=True) or {}
 
     if action == 'checkout':
+        if inmate.medical_isolation_required:
+            return jsonify({
+                'ok': False,
+                'error': 'Medical isolation is required; a Medical Officer must clear it before a work checkout.',
+            }), 409
         if open_transfer:
             return jsonify({
                 'ok': False,
@@ -977,11 +994,21 @@ def api_cell_assignment():
     if security_classification not in InmateService.SECURITY_CLASSIFICATIONS:
         return jsonify({'error': 'Select a valid security classification.'}), 400
 
-    suggestion = InmateService.suggest_cell_block(security_classification)
+    medical_isolation_required = (
+        request.args.get('medical_isolation_required', '').lower() == 'true'
+    )
+    suggestion = InmateService.suggest_cell_block(
+        security_classification,
+        medical_isolation_required=medical_isolation_required,
+    )
     if not suggestion:
+        placement_type = (
+            'medical-isolation units' if medical_isolation_required
+            else 'cell blocks'
+        )
         return jsonify({
             'error': (
-                f'No available cell blocks are configured for '
+                f'No available {placement_type} are configured for '
                 f'{security_classification} classification.'
             )
         }), 404
@@ -1011,7 +1038,9 @@ def readmit(inmate_id):
                                    mode='returning', inmate=inmate, data=data,
                                    has_probe=False,
                                    enrollment_id=data.get('enrollment_id') or secrets.token_urlsafe(24),
-                                   cell_blocks=InmateService.cell_block_options())
+                                   cell_blocks=InmateService.cell_block_options(
+                                       medical_isolation_required=inmate.medical_isolation_required
+                                   ))
         photo_data = data.pop('photo_data', '')
         data.pop('photo_path', None)
         enrollment_id = data.get('enrollment_id')
@@ -1029,7 +1058,9 @@ def readmit(inmate_id):
                                    mode='returning', inmate=inmate, data=data,
                                    has_probe=bool(template),
                                    enrollment_id=enrollment_id,
-                                   cell_blocks=InmateService.cell_block_options())
+                                   cell_blocks=InmateService.cell_block_options(
+                                       medical_isolation_required=inmate.medical_isolation_required
+                                   ))
         if photo_path:
             data['photo_path'] = photo_path
         if document_path:
@@ -1049,7 +1080,9 @@ def readmit(inmate_id):
                                    mode='returning', inmate=inmate, data=data,
                                    has_probe=bool(template),
                                    enrollment_id=enrollment_id,
-                                   cell_blocks=InmateService.cell_block_options())
+                                   cell_blocks=InmateService.cell_block_options(
+                                       medical_isolation_required=inmate.medical_isolation_required
+                                   ))
 
         if (session.get('pending_inmate_enrollment') or {}).get('enrollment_id') == enrollment_id:
             session.pop('pending_inmate_enrollment', None)
@@ -1060,7 +1093,9 @@ def readmit(inmate_id):
     return render_template('inmate/form.html',
                            mode='returning', inmate=inmate, data={}, has_probe=False,
                            enrollment_id=secrets.token_urlsafe(24),
-                           cell_blocks=InmateService.cell_block_options())
+                           cell_blocks=InmateService.cell_block_options(
+                               medical_isolation_required=inmate.medical_isolation_required
+                           ))
 
 
 @inmate_bp.route('/<int:inmate_id>/photo/<filename>')
@@ -1128,6 +1163,21 @@ def detail(inmate_id):
             or record.recorded_by == current_user.user_id
         ]
 
+    isolation_cell_blocks = []
+    medical_isolation_form = InmateMedicalIsolationForm()
+    medical_isolation_form.requires_isolation.data = str(
+        inmate.medical_isolation_required
+    ).lower()
+    if (
+        has_permission(Permissions.MEDICAL_RECORD_CREATE)
+        and inmate.status == 'Active'
+    ):
+        isolation_cell_blocks = InmateService.cell_block_options(
+            inmate.security_classification,
+            medical_isolation_required=True,
+            exclude_inmate_id=inmate.inmate_id,
+        )
+
     return render_template('inmate/detail.html',
                            inmate=inmate, episodes=episodes,
                            disciplinary_logs=disciplinary_logs,
@@ -1136,7 +1186,111 @@ def detail(inmate_id):
                            current_work_transfer=current_work_transfer,
                            today=date.today().isoformat(),
                            pending_edits=pending_edits,
-                           medical_records=medical_records)
+                           medical_records=medical_records,
+                           isolation_cell_blocks=isolation_cell_blocks,
+                           medical_isolation_form=medical_isolation_form)
+
+
+@inmate_bp.route('/<int:inmate_id>/medical-isolation', methods=['POST'])
+@login_required
+@require_permission(Permissions.MEDICAL_RECORD_CREATE)
+def update_medical_isolation(inmate_id):
+    inmate = InmateService.get(inmate_id)
+    if not inmate:
+        abort(404)
+
+    form = InmateMedicalIsolationForm()
+    if not form.validate_on_submit():
+        flash('The medical-isolation update could not be validated.', 'danger')
+        return redirect(url_for('inmate.detail', inmate_id=inmate_id))
+
+    if form.requires_isolation.data not in {'true', 'false'}:
+        flash('Choose whether medical isolation is required.', 'danger')
+        return redirect(url_for('inmate.detail', inmate_id=inmate_id))
+
+    requires_isolation = form.requires_isolation.data == 'true'
+    if inmate.status != 'Active':
+        flash('Medical isolation can only be updated for active inmates.', 'danger')
+        return redirect(url_for('inmate.detail', inmate_id=inmate_id))
+
+    old_required = inmate.medical_isolation_required
+    old_cell_block = inmate.cell_block
+    if requires_isolation:
+        open_transfer = WorkTransferLog.query.filter_by(
+            inmate_id=inmate.inmate_id,
+            checked_in_at=None,
+        ).first()
+        if open_transfer:
+            flash(
+                'Check the inmate back in from work before placing them in a medical-isolation unit.',
+                'danger',
+            )
+            return redirect(url_for('inmate.detail', inmate_id=inmate_id))
+
+        reason = (form.medical_isolation_reason.data or '').strip()
+        if not reason:
+            flash('Enter the clinical reason for requiring medical isolation.', 'danger')
+            return redirect(url_for('inmate.detail', inmate_id=inmate_id))
+
+        cell_block_name = (form.cell_block.data or '').strip()
+        cell_error = InmateService.validate_cell_assignment(
+            cell_block_name,
+            inmate.security_classification,
+            medical_isolation_required=True,
+            exclude_inmate_id=inmate.inmate_id,
+        )
+        if cell_error:
+            flash(cell_error, 'danger')
+            return redirect(url_for('inmate.detail', inmate_id=inmate_id))
+
+        isolation_cell = CellBlock.query.filter_by(name=cell_block_name).first()
+        if not isolation_cell:
+            flash('Select a configured medical-isolation unit.', 'danger')
+            return redirect(url_for('inmate.detail', inmate_id=inmate_id))
+
+        inmate.cell_block = isolation_cell.name
+        inmate.security_classification = isolation_cell.security_classification
+        inmate.cell_number = (form.cell_number.data or '').strip() or None
+        inmate.medical_isolation_required = True
+        inmate.medical_isolation_reason = reason
+    else:
+        inmate.medical_isolation_required = False
+        inmate.medical_isolation_reason = None
+
+    AuditEvent.log_event(
+        event_category='MedicalRecord',
+        event_type='Medical isolation status updated',
+        event_description=(
+            f'Medical isolation was '
+            f'{"required" if requires_isolation else "cleared"} for '
+            f'inmate {inmate.inmate_number}; cell block changed from '
+            f'{old_cell_block or "Unassigned"} to {inmate.cell_block or "Unassigned"}.'
+        ),
+        entity_type='Inmate',
+        entity_id=inmate.inmate_id,
+        user_id=current_user.user_id,
+        username=current_user.username,
+        user_role=current_user.role_name,
+        ip_address=request.remote_addr,
+        user_agent=request.headers.get('User-Agent'),
+        old_values={
+            'medical_isolation_required': old_required,
+            'cell_block': old_cell_block,
+        },
+        new_values={
+            'medical_isolation_required': inmate.medical_isolation_required,
+            'cell_block': inmate.cell_block,
+        },
+    )
+    db.session.commit()
+    flash(
+        'Medical isolation is now required and the inmate was placed in the '
+        'selected isolation unit.'
+        if requires_isolation
+        else 'Medical isolation requirement was cleared.',
+        'success',
+    )
+    return redirect(url_for('inmate.detail', inmate_id=inmate_id))
 
 
 @inmate_bp.route('/<int:inmate_id>/disciplinary', methods=['POST'])

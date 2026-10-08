@@ -65,6 +65,7 @@ class CellBlockForm(FlaskForm):
         choices=[('Minimum', 'Minimum'), ('Medium', 'Medium'), ('Maximum', 'Maximum')],
         validators=[DataRequired()],
     )
+    medical_isolation_unit = BooleanField('Medical isolation unit')
     submit = SubmitField('Add cell block')
 
 
@@ -78,6 +79,11 @@ class CellClassificationForm(FlaskForm):
         ],
         validators=[DataRequired()],
     )
+    submit = SubmitField('Save')
+
+
+class CellMedicalIsolationForm(FlaskForm):
+    medical_isolation_unit = BooleanField('Medical isolation unit')
     submit = SubmitField('Save')
 
 
@@ -281,6 +287,7 @@ def cells():
                 name=name,
                 capacity=form.capacity.data,
                 security_classification=form.security_classification.data,
+                medical_isolation_unit=form.medical_isolation_unit.data,
             )
             db.session.add(cell)
             try:
@@ -302,6 +309,7 @@ def cells():
                         'name': name,
                         'capacity': cell.capacity,
                         'security_classification': cell.security_classification,
+                        'medical_isolation_unit': cell.medical_isolation_unit,
                     },
                 )
                 db.session.commit()
@@ -321,12 +329,23 @@ def cells():
         .group_by(Inmate.cell_block)
         .all()
     )
+    isolation_occupancy_by_name = dict(
+        db.session.query(Inmate.cell_block, func.count(Inmate.inmate_id))
+        .filter(
+            Inmate.status == 'Active',
+            Inmate.medical_isolation_required.is_(True),
+            Inmate.cell_block.isnot(None),
+        )
+        .group_by(Inmate.cell_block)
+        .all()
+    )
     return render_template(
         'admin/cells.html',
         form=form,
         delete_form=CellDeleteForm(),
         cell_blocks=cell_blocks,
         occupancy_by_name=occupancy_by_name,
+        isolation_occupancy_by_name=isolation_occupancy_by_name,
     )
 
 
@@ -382,6 +401,71 @@ def cell_classification(cell_id):
     flash(
         f'Cell block "{cell.name}" classification was updated; '
         f'{len(active_inmates)} active inmate(s) were reclassified.',
+        'success',
+    )
+    return redirect(url_for('admin.cells'))
+
+
+@admin_bp.route('/cells/<int:cell_id>/medical-isolation', methods=['POST'])
+@login_required
+@require_role('System Administrator')
+def cell_medical_isolation(cell_id):
+    form = CellMedicalIsolationForm()
+    if not form.validate_on_submit():
+        flash('The medical-isolation setting could not be validated.', 'danger')
+        return redirect(url_for('admin.cells'))
+
+    cell = CellBlock.query.get_or_404(cell_id)
+    if form.medical_isolation_unit.data and not cell.medical_isolation_unit:
+        non_isolated_occupancy = Inmate.query.filter(
+            Inmate.cell_block == cell.name,
+            Inmate.status == 'Active',
+            Inmate.medical_isolation_required.is_(False),
+        ).count()
+        if non_isolated_occupancy:
+            flash(
+                f'Cannot designate "{cell.name}" as a medical-isolation unit '
+                f'while {non_isolated_occupancy} non-isolated inmate(s) remain assigned.',
+                'danger',
+            )
+            return redirect(url_for('admin.cells'))
+
+    if not form.medical_isolation_unit.data:
+        isolated_occupancy = Inmate.query.filter_by(
+            cell_block=cell.name,
+            status='Active',
+            medical_isolation_required=True,
+        ).count()
+        if isolated_occupancy:
+            flash(
+                f'Cannot remove medical-isolation status from "{cell.name}" '
+                f'while {isolated_occupancy} isolated inmate(s) remain assigned.',
+                'danger',
+            )
+            return redirect(url_for('admin.cells'))
+
+    old_value = cell.medical_isolation_unit
+    cell.medical_isolation_unit = form.medical_isolation_unit.data
+    AuditEvent.log_event(
+        event_category='Facility',
+        event_type='Cell block medical-isolation setting updated',
+        event_description=(
+            f'Updated medical-isolation designation for cell block {cell.name} '
+            f'from {old_value} to {cell.medical_isolation_unit}.'
+        ),
+        entity_type='CellBlock',
+        entity_id=cell.id,
+        user_id=current_user.user_id,
+        username=current_user.username,
+        user_role=current_user.role_name,
+        ip_address=request.remote_addr,
+        user_agent=request.headers.get('User-Agent'),
+        old_values={'medical_isolation_unit': old_value},
+        new_values={'medical_isolation_unit': cell.medical_isolation_unit},
+    )
+    db.session.commit()
+    flash(
+        f'Medical-isolation designation for "{cell.name}" was updated.',
         'success',
     )
     return redirect(url_for('admin.cells'))

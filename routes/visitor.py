@@ -6,21 +6,28 @@ from flask import (Blueprint, render_template, redirect, url_for,
                    flash, request, session, current_app, jsonify, abort,
                    send_from_directory)
 from flask_login import login_required, current_user
+from flask_wtf import FlaskForm
 from sqlalchemy import or_
-from models import Visitor, VisitLog
-
-from extensions import csrf
+from wtforms import TextAreaField
+from wtforms.validators import DataRequired, Length
+from extensions import csrf, db
 from services.rbac import require_permission, Permissions
 from services.visitor_service import VisitorService
 from services.visitor_matcher import VisitorMatcher
 from services.biometric_agent_client import BiometricAgentClient, BiometricAgentError
 from services.person_photo_service import PersonPhotoService
-from models.visitor import Visitor, VisitLog
+from models.visitor import Visitor, VisitorBlacklistEvent, VisitLog
 from models.inmate import Inmate
 
 
 visitor_bp = Blueprint('visitor', __name__, url_prefix='/visitor')
 csrf.exempt(visitor_bp)
+
+
+class VisitorBlacklistForm(FlaskForm):
+    reason = TextAreaField(
+        validators=[DataRequired(), Length(max=2000)],
+    )
 
 
 def _mock_mode():
@@ -42,9 +49,26 @@ def list_visitors():
     pagination = VisitorService.list_visitors(
         search=search, page=page, per_page=15
     )
+    visitor_ids = [visitor.visitor_id for visitor in pagination.items]
+    blacklist_counts = dict(
+        db.session.query(
+            VisitorBlacklistEvent.visitor_id,
+            db.func.count(VisitorBlacklistEvent.event_id),
+        )
+        .filter(
+            VisitorBlacklistEvent.visitor_id.in_(visitor_ids),
+            VisitorBlacklistEvent.action == 'Blocked',
+        )
+        .group_by(VisitorBlacklistEvent.visitor_id)
+        .all()
+    ) if visitor_ids else {}
     return render_template('visitor/list.html',
                            pagination=pagination, visitors=pagination.items,
-                           search=search)
+                           search=search,
+                           blacklist_counts=blacklist_counts,
+                           permanent_blacklist_threshold=(
+                               VisitorService.PERMANENT_BLACKLIST_THRESHOLD
+                           ))
 
 
 # ---------- Scan page ----------
@@ -52,7 +76,11 @@ def list_visitors():
 @login_required
 @require_permission(Permissions.VISITOR_BIOMETRIC_VERIFY)
 def scan():
-    return render_template('visitor/scan.html', mock_mode=_mock_mode())
+    return render_template(
+        'visitor/scan.html',
+        mock_mode=_mock_mode(),
+        blacklist_form=VisitorBlacklistForm(),
+    )
 
 
 # ---------- API: scan + 1:N identify ----------
@@ -78,6 +106,9 @@ def api_scan_identify():
 
     if result['match']:
         v = result['visitor']
+        blacklist_incident_count = VisitorService.blacklist_incident_count(
+            v.visitor_id
+        )
         return jsonify({
             'ok': True, 'match': True,
             'score': round(result['score'], 1),
@@ -90,9 +121,17 @@ def api_scan_identify():
                 'relationship_to_inmate': v.relationship_to_inmate,
                 'total_visits': v.total_visits,
                 'is_blacklisted': v.is_blacklisted,
+                'blacklist_reason': v.blacklist_reason,
+                'blacklist_incident_count': blacklist_incident_count,
+                'permanently_blacklisted': (
+                    blacklist_incident_count
+                    >= VisitorService.PERMANENT_BLACKLIST_THRESHOLD
+                ),
+                'blacklist_threshold': VisitorService.PERMANENT_BLACKLIST_THRESHOLD,
                 'anomaly_flag': v.anomaly_flag,
             },
             'redirect': url_for('visitor.check_in', visitor_id=v.visitor_id),
+            'block_url': url_for('visitor.blacklist', visitor_id=v.visitor_id),
         })
 
     return jsonify({
@@ -254,8 +293,81 @@ def detail(visitor_id):
     visits = visitor.visit_logs.order_by(
         order_col.desc(), VisitLog.visit_id.desc()
     ).limit(30).all()
+    blacklist_events = visitor.blacklist_events.order_by(
+        VisitorBlacklistEvent.event_at.desc(),
+        VisitorBlacklistEvent.event_id.desc(),
+    ).all()
+    blacklist_incident_count = sum(
+        event.action == 'Blocked' for event in blacklist_events
+    )
 
-    return render_template('visitor/detail.html', visitor=visitor, visits=visits)
+    return render_template(
+        'visitor/detail.html',
+        visitor=visitor,
+        visits=visits,
+        blacklist_events=blacklist_events,
+        blacklist_incident_count=blacklist_incident_count,
+        permanent_blacklist_threshold=VisitorService.PERMANENT_BLACKLIST_THRESHOLD,
+        blacklist_form=VisitorBlacklistForm(),
+        clear_blacklist_form=VisitorBlacklistForm(),
+    )
+
+
+@visitor_bp.route('/<int:visitor_id>/blacklist', methods=['POST'])
+@login_required
+@require_permission(Permissions.VISITOR_BLACKLIST)
+def blacklist(visitor_id):
+    form = VisitorBlacklistForm()
+    if not form.validate_on_submit():
+        flash('Enter a valid reason for blocking the visitor (maximum 2,000 characters).', 'danger')
+        return redirect(url_for('visitor.detail', visitor_id=visitor_id))
+
+    result, error = VisitorService.blacklist_visitor(
+        actor=current_user,
+        visitor_id=visitor_id,
+        reason=form.reason.data,
+    )
+    if error:
+        flash(error, 'danger')
+    elif result['permanent']:
+        flash(
+            f'Visitor blacklisted for incident {result["incident_count"]}. '
+            'The blacklist is now permanent and cannot be cleared.',
+            'danger',
+        )
+    else:
+        flash(
+            f'Visitor blocked. This is incident {result["incident_count"]} '
+            f'of {VisitorService.PERMANENT_BLACKLIST_THRESHOLD}; only an administrator '
+            'can clear the blacklist.',
+            'success',
+        )
+    return redirect(url_for('visitor.detail', visitor_id=visitor_id))
+
+
+@visitor_bp.route('/<int:visitor_id>/blacklist/clear', methods=['POST'])
+@login_required
+@require_permission(Permissions.VISITOR_BLACKLIST_CLEAR)
+def clear_blacklist(visitor_id):
+    form = VisitorBlacklistForm()
+    if not form.validate_on_submit():
+        flash('Enter a valid reason for clearing the blacklist.', 'danger')
+        return redirect(url_for('visitor.detail', visitor_id=visitor_id))
+
+    result, error = VisitorService.clear_blacklist(
+        actor=current_user,
+        visitor_id=visitor_id,
+        reason=form.reason.data,
+    )
+    if error:
+        flash(error, 'danger')
+    else:
+        flash(
+            f'Blacklist cleared. This visitor has {result["incident_count"]} '
+            'blocking incident(s) recorded.',
+            'success',
+        )
+    return redirect(url_for('visitor.detail', visitor_id=visitor_id))
 
 # ---------- Check-in ----------
 @visitor_bp.route('/<int:visitor_id>/check-in', methods=['GET', 'POST'])

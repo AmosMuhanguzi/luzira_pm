@@ -167,7 +167,11 @@
                         </button>
                     </div>
                     <div id="cellAssignmentStatus" class="form-text" aria-live="polite">
+                        {% if mode == 'returning' and inmate.medical_isolation_required %}
+                        This inmate requires a medical-isolation unit with a matching security classification.
+                        {% else %}
                         Choose a suitable block manually for special placements, or use Auto to balance occupancy.
+                        {% endif %}
                     </div>
                 </div>
                 <div class="col-md-3">
@@ -246,6 +250,7 @@ const securityClassSelect = document.querySelector('[name="security_classificati
 const autoAssignCellButton = document.getElementById('autoAssignCell');
 const cellAssignmentStatus = document.getElementById('cellAssignmentStatus');
 const cellBlockOptions = {{ cell_blocks|tojson }};
+const requiresMedicalIsolation = {{ (inmate.medical_isolation_required if mode == 'returning' and inmate else false)|tojson }};
 
 function refreshCellBlockOptions() {
     const selectedClass = securityClassSelect.value;
@@ -253,7 +258,9 @@ function refreshCellBlockOptions() {
     Array.from(cellBlockSelect.options).forEach(option => {
         if (!option.value) return;
         const block = cellBlockOptions.find(item => item.name === option.value);
-        option.hidden = !block || block.security_classification !== selectedClass;
+        option.hidden = !block
+            || block.security_classification !== selectedClass
+            || (requiresMedicalIsolation && !block.medical_isolation_unit);
         if (block) {
             option.disabled = !block.available && option.value !== currentValue;
         }
@@ -274,7 +281,7 @@ autoAssignCellButton.addEventListener('click', async () => {
     cellAssignmentStatus.textContent = 'Finding the least-occupied suitable block…';
     try {
         const response = await fetch(
-            `${cellAssignmentUrl}?security_classification=${encodeURIComponent(securityClassSelect.value)}`
+            `${cellAssignmentUrl}?security_classification=${encodeURIComponent(securityClassSelect.value)}&medical_isolation_required=${requiresMedicalIsolation}`
         );
         const result = await response.json();
         if (!response.ok) throw new Error(result.error || 'Cell assignment failed.');

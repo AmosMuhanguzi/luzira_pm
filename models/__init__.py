@@ -6,7 +6,7 @@ from models.base import BaseModel, TimestampMixin, SerializableMixin
 
 from models.user import Role, UserAccount
 from models.inmate import Inmate, AdmissionEpisode
-from models.visitor import Visitor
+from models.visitor import Visitor, VisitorBlacklistEvent
 from models.visit import VisitLog
 from models.medical import (
     MedicalRecord, MedicalRecordAttachment, DisciplinaryLog, EscapeAttemptLog,
@@ -21,7 +21,7 @@ __all__ = [
     'BaseModel', 'TimestampMixin', 'SerializableMixin',
     'Role', 'UserAccount',
     'Inmate', 'AdmissionEpisode',
-    'Visitor', 'VisitLog',
+    'Visitor', 'VisitorBlacklistEvent', 'VisitLog',
     'MedicalRecord', 'MedicalRecordAttachment', 'DisciplinaryLog', 'EscapeAttemptLog',
     'WorkTransferLog',
     'AIAnalysisLog', 'VisitorPattern', 'PopulationForecast',

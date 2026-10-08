@@ -68,6 +68,8 @@ class Inmate(BaseModel):
     # ---- Medical flags ----
     has_medical_condition = db.Column(db.Boolean, default=False)
     medical_alert         = db.Column(db.Text)
+    medical_isolation_required = db.Column(db.Boolean, default=False, nullable=False)
+    medical_isolation_reason = db.Column(db.Text)
 
     # ---- Risk ----
     risk_level             = db.Column(db.String(20), default='Low')

@@ -16,43 +16,71 @@ class InmateService:
     SECURITY_CLASSIFICATIONS = ('Minimum', 'Medium', 'Maximum')
 
     @staticmethod
-    def cell_block_options(security_classification=None):
+    def cell_block_options(
+        security_classification=None,
+        medical_isolation_required=False,
+        exclude_inmate_id=None,
+    ):
         query = CellBlock.query
         if security_classification:
             query = query.filter_by(
                 security_classification=security_classification
             )
+        query = query.filter_by(
+            medical_isolation_unit=medical_isolation_required
+        )
 
         blocks = query.order_by(CellBlock.name.asc()).all()
+        occupancy_query = db.session.query(
+            Inmate.cell_block, func.count(Inmate.inmate_id)
+        ).filter(Inmate.status == 'Active', Inmate.cell_block.isnot(None))
+        if exclude_inmate_id is not None:
+            occupancy_query = occupancy_query.filter(
+                Inmate.inmate_id != exclude_inmate_id
+            )
         occupancy_by_name = dict(
-            db.session.query(Inmate.cell_block, func.count(Inmate.inmate_id))
-            .filter(Inmate.status == 'Active', Inmate.cell_block.isnot(None))
-            .group_by(Inmate.cell_block)
-            .all()
+            occupancy_query.group_by(Inmate.cell_block).all()
         )
         return [{
             'name': block.name,
             'security_classification': block.security_classification,
+            'medical_isolation_unit': block.medical_isolation_unit,
             'capacity': block.capacity,
             'occupancy': occupancy_by_name.get(block.name, 0),
             'available': occupancy_by_name.get(block.name, 0) < block.capacity,
         } for block in blocks]
 
     @staticmethod
-    def validate_cell_assignment(cell_name, security_classification):
+    def validate_cell_assignment(
+        cell_name,
+        security_classification,
+        medical_isolation_required=False,
+        exclude_inmate_id=None,
+    ):
         if security_classification not in InmateService.SECURITY_CLASSIFICATIONS:
             return 'Select a valid security classification before assigning a cell.'
         if not cell_name:
+            if medical_isolation_required:
+                return 'A medical-isolation cell block is required for this inmate.'
             return None
 
         option = next(
             (
-                cell for cell in InmateService.cell_block_options(security_classification)
+                cell for cell in InmateService.cell_block_options(
+                    security_classification,
+                    medical_isolation_required=medical_isolation_required,
+                    exclude_inmate_id=exclude_inmate_id,
+                )
                 if cell['name'] == cell_name
             ),
             None,
         )
         if not option:
+            if medical_isolation_required:
+                return (
+                    f'Cell block "{cell_name}" is not a designated medical-isolation '
+                    f'unit for {security_classification} classification.'
+                )
             return (
                 f'Cell block "{cell_name}" is not configured for '
                 f'{security_classification} classification.'
@@ -62,9 +90,17 @@ class InmateService:
         return None
 
     @staticmethod
-    def suggest_cell_block(security_classification):
+    def suggest_cell_block(
+        security_classification,
+        medical_isolation_required=False,
+        exclude_inmate_id=None,
+    ):
         options = [
-            option for option in InmateService.cell_block_options(security_classification)
+            option for option in InmateService.cell_block_options(
+                security_classification,
+                medical_isolation_required=medical_isolation_required,
+                exclude_inmate_id=exclude_inmate_id,
+            )
             if option['available']
         ]
         if not options:
@@ -228,7 +264,10 @@ class InmateService:
         )
         cell_name = data.get('cell_block', inmate.cell_block) or None
         cell_error = InmateService.validate_cell_assignment(
-            cell_name, security_classification
+            cell_name,
+            security_classification,
+            medical_isolation_required=inmate.medical_isolation_required,
+            exclude_inmate_id=inmate.inmate_id,
         )
         if cell_error:
             return None, cell_error

@@ -128,13 +128,15 @@
                 {% if has_permission(Permissions.INMATE_RELEASE) %}
                 <li class="nav-item">
                     <a class="nav-link" href="{{ url_for('inmate.release_form') }}">
-                        <i class="bi bi-box-arrow-right"></i> Release
-                    </a>
+                       <img class="release-icon release-icon--nav"
+                            src="{{ url_for('static', filename='images/release-icon.png') }}"
+                            alt=""> Release
+                   </a>
                 </li>
                 {% endif %}
                 {% endif %}
                 {% if current_user.role_name in
-                      ['System Administrator', 'Warden', 'Receptionist', 'Security Officer'] %}
+                      ['System Administrator', 'Warden', 'Records Officer', 'Receptionist', 'Security Officer'] %}
                 <li class="nav-item">
                     <a class="nav-link" href="{{ url_for('visitor.list_visitors') }}">
                         <img class="visitor-icon visitor-icon--nav"

@@ -51,13 +51,14 @@
                     <th>Relationship</th>
                     <th>Visits</th>
                     <th>Last visit</th>
+                    <th>Status</th>
                     <th>Flags</th>
                     <th></th>
                 </tr>
             </thead>
             <tbody>
             {% for v in visitors %}
-                <tr>
+                <tr class="{{ 'table-danger' if v.is_blacklisted }}">
                     <td><code>{{ v.visitor_number }}</code></td>
                     <td>
                         <div class="fw-semibold">{{ v.full_name }}</div>
@@ -72,10 +73,17 @@
                     </td>
                     <td>
                         {% if v.is_blacklisted %}
-                            <span class="badge bg-danger">
-                                <i class="bi bi-slash-circle"></i> Blacklisted
-                            </span>
+                        <span class="badge bg-danger">
+                            <i class="bi bi-slash-circle"></i> Blacklisted
+                        </span>
+                        {% if blacklist_counts.get(v.visitor_id, 0) >= permanent_blacklist_threshold %}
+                        <span class="badge bg-dark">Permanent</span>
                         {% endif %}
+                        {% else %}
+                        <span class="badge bg-success">Allowed</span>
+                        {% endif %}
+                    </td>
+                    <td>
                         {% if v.anomaly_flag %}
                             <span class="badge bg-warning text-dark">
                                 <i class="bi bi-robot"></i> Anomaly
@@ -91,7 +99,7 @@
                     </td>
                 </tr>
             {% else %}
-                <tr><td colspan="8" class="text-center text-muted py-4">
+                <tr><td colspan="9" class="text-center text-muted py-4">
                     No visitors yet. Use <strong>Gate Scan</strong> to register the first one.
                 </td></tr>
             {% endfor %}

@@ -56,11 +56,7 @@
                 <a href="{{ url_for('inmate.list_inmates') }}" class="btn btn-sm btn-outline-primary"><img class="inmate-icon" src="{{ url_for('static', filename='images/inmate-icon.png') }}" alt=""> Inmate Records</a>
                 <a href="{{ url_for('edit_requests.my_requests') }}" class="btn btn-sm btn-outline-warning"><i class="bi bi-send-check"></i> My Requests</a>
 
-            {% elif role == 'Records Officer' %}
-                <a href="{{ url_for('inmate.list_inmates') }}" class="btn btn-sm btn-outline-primary"><img class="inmate-icon" src="{{ url_for('static', filename='images/inmate-icon.png') }}" alt=""> Inmate Records</a>
-                <a href="{{ url_for('edit_requests.my_requests') }}" class="btn btn-sm btn-outline-warning"><i class="bi bi-send-check"></i> My Requests</a>
-
-            {% elif role == 'Receptionist' %}
+            {% elif role in ['Records Officer', 'Receptionist'] %}
                 <a href="{{ url_for('inmate.intake_scan') }}" class="btn btn-sm btn-outline-warning"><i class="bi bi-fingerprint"></i> Intake</a>
                 <a href="{{ url_for('inmate.list_inmates') }}" class="btn btn-sm btn-outline-primary"><img class="inmate-icon" src="{{ url_for('static', filename='images/inmate-icon.png') }}" alt=""> Inmate Records</a>
                 <a href="{{ url_for('edit_requests.my_requests') }}" class="btn btn-sm btn-outline-info"><i class="bi bi-send-check"></i> My Requests</a>
@@ -78,15 +74,98 @@
 </div>
 
 {% if role == 'Medical Officer' %}
+<div class="row g-3 mb-4">
+    <div class="col-md-6">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body d-flex justify-content-between align-items-center">
+                <div>
+                    <div class="text-muted small">Medical records you can view</div>
+                    <div class="fs-3 fw-bold">{{ medical_record_count|default(0) }}</div>
+                </div>
+                <i class="bi bi-clipboard2-pulse text-primary fs-2" aria-hidden="true"></i>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body d-flex justify-content-between align-items-center">
+                <div>
+                    <div class="text-muted small">Your submissions awaiting admin review</div>
+                    <div class="fs-3 fw-bold">{{ pending_medical_submission_count|default(0) }}</div>
+                </div>
+                <i class="bi bi-hourglass-split text-warning fs-2" aria-hidden="true"></i>
+            </div>
+        </div>
+    </div>
+</div>
+
 <div class="card border-0 shadow-sm">
-    <div class="card-body">
-        <h4><i class="bi bi-heart-pulse text-danger"></i> Medical Workspace</h4>
-        <p class="text-muted mb-3">
-            Review inmate records, add medical notes or documents, and track submissions awaiting administrator approval.
-        </p>
-        <a href="{{ url_for('inmate.list_inmates') }}" class="btn btn-primary">
-            <img class="inmate-icon" src="{{ url_for('static', filename='images/inmate-icon.png') }}" alt=""> Open Inmate Records
+    <div class="card-header bg-white d-flex justify-content-between align-items-center py-3">
+        <h5 class="mb-0"><i class="bi bi-clock-history text-primary"></i> Recent Medical Records Edited</h5>
+        <a href="{{ url_for('inmate.list_inmates') }}" class="btn btn-sm btn-outline-primary">
+            <img class="inmate-icon" src="{{ url_for('static', filename='images/inmate-icon.png') }}" alt=""> Inmate Records
         </a>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>Last activity</th>
+                    <th>Inmate</th>
+                    <th>Record</th>
+                    <th>Diagnosis / treatment</th>
+                    <th>Files</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for record in recent_medical_records %}
+                <tr>
+                    <td class="small text-nowrap">
+                        {{ record.updated_at.strftime('%Y-%m-%d %H:%M') if record.updated_at else record.record_date }}
+                        {% if record.updated_at and record.created_at and record.updated_at > record.created_at %}
+                        <span class="d-block text-muted">Updated</span>
+                        {% else %}
+                        <span class="d-block text-muted">Added</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if record.inmate %}
+                        <a href="{{ url_for('inmate.detail', inmate_id=record.inmate.inmate_id) }}">
+                            {{ record.inmate.full_name }}
+                        </a>
+                        <span class="d-block small text-muted">{{ record.inmate.inmate_number }}</span>
+                        {% else %}Inmate unavailable{% endif %}
+                    </td>
+                    <td>
+                        <strong>{{ record.record_type or 'Medical record' }}</strong>
+                        <span class="d-block small text-muted">{{ record.record_date }}</span>
+                    </td>
+                    <td>
+                        {{ record.diagnosis or record.complaint or '—' }}
+                        {% if record.treatment_prescribed %}
+                        <span class="d-block small text-muted">{{ record.treatment_prescribed }}</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ record.attachments|length + (1 if record.attachment_path else 0) }}</td>
+                    <td>
+                        <span class="badge
+                            {% if record.approval_status == 'Approved' %}bg-success
+                            {% elif record.approval_status == 'Pending' %}bg-warning text-dark
+                            {% else %}bg-secondary{% endif %}">
+                            {{ record.approval_status }}
+                        </span>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="6" class="text-center text-muted py-4">
+                        No medical records or updates are available yet.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
     </div>
 </div>
 {% else %}
@@ -188,6 +267,189 @@
         </div>
     </div>
 </div>
+
+{% if can_view_inmate_transfers %}
+<div class="row g-4 mb-4">
+    <div class="col-lg-6">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center py-3">
+                <h5 class="mb-0"><i class="bi bi-briefcase text-primary"></i> Recent Work Transfers</h5>
+                <span class="badge bg-primary">{{ total_work_transfers }} total</span>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Inmate</th>
+                            <th>Work location</th>
+                            <th>Checked out</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for transfer in recent_work_transfers %}
+                        <tr>
+                            <td>
+                                {% if transfer.inmate %}
+                                <a href="{{ url_for('inmate.detail', inmate_id=transfer.inmate_id) }}"
+                                   class="fw-semibold text-decoration-none">
+                                    {{ transfer.inmate.full_name }}
+                                </a>
+                                <span class="d-block small text-muted">{{ transfer.inmate.inmate_number }}</span>
+                                {% else %}Inmate record unavailable{% endif %}
+                            </td>
+                            <td>{{ transfer.work_location }}</td>
+                            <td class="small text-nowrap">
+                                {{ transfer.checked_out_at.strftime('%Y-%m-%d %H:%M') if transfer.checked_out_at else '—' }}
+                            </td>
+                            <td>
+                                {% if transfer.is_out %}
+                                <span class="badge bg-warning text-dark">Out</span>
+                                {% else %}
+                                <span class="badge bg-success">Returned</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="4" class="text-center text-muted py-4">
+                                No work transfers have been recorded.
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-6">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center py-3">
+                <h5 class="mb-0"><i class="bi bi-building-exclamation text-danger"></i> Recent Prison Transfers</h5>
+                <span class="badge bg-danger">{{ total_prison_transfers }} total</span>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Inmate</th>
+                            <th>Receiving prison</th>
+                            <th>Transfer date</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for transfer in recent_prison_transfers %}
+                        <tr>
+                            <td>
+                                {% if transfer.inmate %}
+                                <a href="{{ url_for('inmate.detail', inmate_id=transfer.inmate_id) }}"
+                                   class="fw-semibold text-decoration-none">
+                                    {{ transfer.inmate.full_name }}
+                                </a>
+                                <span class="d-block small text-muted">{{ transfer.inmate.inmate_number }}</span>
+                                {% else %}Inmate record unavailable{% endif %}
+                            </td>
+                            <td>{{ transfer.transfer_to or '—' }}</td>
+                            <td class="small text-nowrap">
+                                {{ transfer.release_date.strftime('%Y-%m-%d') if transfer.release_date else '—' }}
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="3" class="text-center text-muted py-4">
+                                No prison transfers have been recorded.
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% if can_view_visitor_blacklist %}
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-header bg-white d-flex flex-wrap justify-content-between align-items-center gap-2 py-3">
+        <h5 class="mb-0">
+            <i class="bi bi-shield-exclamation text-danger"></i>
+            Recent Visitor Blacklist Activity
+        </h5>
+        <div class="d-flex align-items-center gap-2">
+            <span class="badge bg-danger">
+                {{ blacklisted_visitor_count }} currently blocked
+            </span>
+            <a href="{{ url_for('visitor.list_visitors') }}" class="btn btn-sm btn-outline-primary">
+                All visitors
+            </a>
+        </div>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>Time</th>
+                    <th>Visitor</th>
+                    <th>Action</th>
+                    <th>Reason</th>
+                    <th>Incidents</th>
+                    <th>Current status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for event in recent_blacklist_events %}
+                {% set incident_count = blacklist_incident_counts.get(event.visitor_id, 0) %}
+                <tr>
+                    <td class="small text-nowrap">
+                        {{ event.event_at.strftime('%Y-%m-%d %H:%M') if event.event_at else '—' }}
+                        {% if event.actor %}
+                        <span class="d-block text-muted">by {{ event.actor.full_name }}</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if event.visitor %}
+                        <a href="{{ url_for('visitor.detail', visitor_id=event.visitor_id) }}"
+                           class="fw-semibold text-decoration-none">
+                            {{ event.visitor.full_name }}
+                        </a>
+                        <span class="d-block small text-muted">{{ event.visitor.visitor_number or 'Visitor' }}</span>
+                        {% else %}
+                        Visitor record unavailable
+                        {% endif %}
+                    </td>
+                    <td>
+                        <span class="badge {{ 'bg-danger' if event.action == 'Blocked' else 'bg-success' }}">
+                            {{ event.action }}
+                        </span>
+                    </td>
+                    <td class="small">{{ event.reason }}</td>
+                    <td class="text-nowrap">
+                        {{ incident_count }} / {{ permanent_blacklist_threshold }}
+                        {% if incident_count >= permanent_blacklist_threshold %}
+                        <span class="badge bg-dark">Permanent</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if event.visitor and event.visitor.is_blacklisted %}
+                        <span class="badge bg-danger">Blacklisted</span>
+                        {% else %}
+                        <span class="badge bg-success">Allowed</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="6" class="text-center text-muted py-4">
+                        No visitor blacklist activity has been recorded.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
 
 <div class="modal fade" id="cellModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-centered">

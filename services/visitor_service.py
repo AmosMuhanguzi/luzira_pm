@@ -7,13 +7,15 @@ import base64
 from datetime import date, datetime
 from sqlalchemy import or_, func
 from extensions import db
-from models.visitor import Visitor
+from models.visitor import Visitor, VisitorBlacklistEvent
 from models.visit import VisitLog
 from models.inmate import Inmate
 from models.audit import AuditEvent
 
 
 class VisitorService:
+    PERMANENT_BLACKLIST_THRESHOLD = 4
+
 
     # ---------- Read ----------
     @staticmethod
@@ -42,6 +44,114 @@ class VisitorService:
     @staticmethod
     def get(visitor_id) -> Visitor:
         return Visitor.query.get(visitor_id)
+
+    @staticmethod
+    def blacklist_incident_count(visitor_id):
+        return VisitorBlacklistEvent.query.filter_by(
+            visitor_id=visitor_id,
+            action='Blocked',
+        ).count()
+
+    @staticmethod
+    def blacklist_visitor(actor, visitor_id, reason):
+        visitor = Visitor.query.filter_by(visitor_id=visitor_id).with_for_update().first()
+        if not visitor:
+            return None, 'Visitor not found.'
+        if visitor.is_blacklisted:
+            return None, 'This visitor is already blacklisted.'
+
+        reason = (reason or '').strip()
+        if not reason:
+            return None, 'Enter a reason for blocking this visitor.'
+        if len(reason) > 2000:
+            return None, 'The blocking reason must be no more than 2,000 characters.'
+
+        previous_count = VisitorService.blacklist_incident_count(visitor.visitor_id)
+        incident_count = previous_count + 1
+        event = VisitorBlacklistEvent(
+            visitor_id=visitor.visitor_id,
+            action='Blocked',
+            reason=reason,
+            recorded_by=actor.user_id,
+        )
+        visitor.is_flagged = True
+        visitor.flag_reason = reason
+        db.session.add(event)
+        AuditEvent.log_event(
+            event_category='Visitor',
+            event_type='Visitor blacklisted',
+            event_description=(
+                f'Blacklisted visitor {visitor.visitor_number or visitor.visitor_id} '
+                f'for incident {incident_count}: {reason}'
+            ),
+            entity_type='Visitor',
+            entity_id=visitor.visitor_id,
+            user_id=actor.user_id,
+            username=actor.username,
+            user_role=actor.role_name,
+            old_values={'is_blacklisted': False},
+            new_values={
+                'is_blacklisted': True,
+                'incident_count': incident_count,
+                'permanent': incident_count >= VisitorService.PERMANENT_BLACKLIST_THRESHOLD,
+                'reason': reason,
+            },
+            success=True,
+        )
+        db.session.commit()
+        return {
+            'incident_count': incident_count,
+            'permanent': incident_count >= VisitorService.PERMANENT_BLACKLIST_THRESHOLD,
+        }, None
+
+    @staticmethod
+    def clear_blacklist(actor, visitor_id, reason):
+        visitor = Visitor.query.filter_by(visitor_id=visitor_id).with_for_update().first()
+        if not visitor:
+            return None, 'Visitor not found.'
+        if not visitor.is_blacklisted:
+            return None, 'This visitor is not currently blacklisted.'
+
+        incident_count = VisitorService.blacklist_incident_count(visitor.visitor_id)
+        if incident_count >= VisitorService.PERMANENT_BLACKLIST_THRESHOLD:
+            return None, (
+                f'This visitor has {incident_count} blocking incidents and is '
+                'permanently blacklisted.'
+            )
+
+        reason = (reason or '').strip()
+        if not reason:
+            return None, 'Enter a reason for clearing this blacklist.'
+        if len(reason) > 2000:
+            return None, 'The clearing reason must be no more than 2,000 characters.'
+
+        previous_reason = visitor.flag_reason
+        visitor.is_flagged = False
+        visitor.flag_reason = None
+        db.session.add(VisitorBlacklistEvent(
+            visitor_id=visitor.visitor_id,
+            action='Cleared',
+            reason=reason,
+            recorded_by=actor.user_id,
+        ))
+        AuditEvent.log_event(
+            event_category='Visitor',
+            event_type='Visitor blacklist cleared',
+            event_description=(
+                f'Cleared blacklist for visitor '
+                f'{visitor.visitor_number or visitor.visitor_id}: {reason}'
+            ),
+            entity_type='Visitor',
+            entity_id=visitor.visitor_id,
+            user_id=actor.user_id,
+            username=actor.username,
+            user_role=actor.role_name,
+            old_values={'is_blacklisted': True, 'reason': previous_reason},
+            new_values={'is_blacklisted': False, 'incident_count': incident_count},
+            success=True,
+        )
+        db.session.commit()
+        return {'incident_count': incident_count}, None
 
     @staticmethod
     def generate_visitor_number() -> str:

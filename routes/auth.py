@@ -253,9 +253,84 @@ def _utc_bounds_for_facility_date(day):
 @login_required
 def dashboard():
     from models.inmate import AdmissionEpisode
+    from models.medical import MedicalRecord, WorkTransferLog
+    from models.visitor import VisitorBlacklistEvent
+    from services.rbac import has_permission, Permissions
+    from services.visitor_service import VisitorService
+    from sqlalchemy import or_
 
     today = datetime.now(FACILITY_TIMEZONE).date()
     role = getattr(current_user, 'role_name', 'User')
+    recent_medical_records = []
+    medical_record_count = 0
+    pending_medical_submission_count = 0
+    recent_blacklist_events = []
+    blacklist_incident_counts = {}
+    blacklisted_visitor_count = 0
+    recent_work_transfers = []
+    recent_prison_transfers = []
+    total_work_transfers = 0
+    total_prison_transfers = 0
+
+    if has_permission(Permissions.INMATE_VIEW):
+        total_work_transfers = WorkTransferLog.query.count()
+        recent_work_transfers = WorkTransferLog.query.order_by(
+            WorkTransferLog.checked_out_at.desc(),
+            WorkTransferLog.transfer_id.desc(),
+        ).limit(5).all()
+
+        prison_transfers = AdmissionEpisode.query.filter(
+            AdmissionEpisode.release_type == 'Transfer',
+            AdmissionEpisode.release_date.isnot(None),
+        )
+        total_prison_transfers = prison_transfers.count()
+        recent_prison_transfers = prison_transfers.order_by(
+            AdmissionEpisode.release_date.desc(),
+            AdmissionEpisode.episode_id.desc(),
+        ).limit(5).all()
+
+    if has_permission(Permissions.VISITOR_VIEW):
+        recent_blacklist_events = VisitorBlacklistEvent.query.order_by(
+            VisitorBlacklistEvent.event_at.desc(),
+            VisitorBlacklistEvent.event_id.desc(),
+        ).limit(8).all()
+        event_visitor_ids = {
+            event.visitor_id for event in recent_blacklist_events
+        }
+        if event_visitor_ids:
+            blacklist_incident_counts = dict(
+                db.session.query(
+                    VisitorBlacklistEvent.visitor_id,
+                    func.count(VisitorBlacklistEvent.event_id),
+                )
+                .filter(
+                    VisitorBlacklistEvent.visitor_id.in_(event_visitor_ids),
+                    VisitorBlacklistEvent.action == 'Blocked',
+                )
+                .group_by(VisitorBlacklistEvent.visitor_id)
+                .all()
+            )
+        blacklisted_visitor_count = Visitor.query.filter_by(
+            is_flagged=True
+        ).count()
+
+    if role == 'Medical Officer':
+        visible_medical_records = MedicalRecord.query.filter(
+            or_(
+                MedicalRecord.approval_status == 'Approved',
+                MedicalRecord.recorded_by == current_user.user_id,
+            )
+        )
+        medical_record_count = visible_medical_records.count()
+        pending_medical_submission_count = MedicalRecord.query.filter_by(
+            recorded_by=current_user.user_id,
+            approval_status='Pending',
+        ).count()
+        recent_medical_records = visible_medical_records.order_by(
+            MedicalRecord.updated_at.desc(),
+            MedicalRecord.created_at.desc(),
+            MedicalRecord.record_id.desc(),
+        ).limit(8).all()
 
     # 1. Inmate Metrics
     total_inmates_now = Inmate.query.filter_by(status='Active').count() if hasattr(Inmate, 'status') else Inmate.query.count()
@@ -328,5 +403,18 @@ def dashboard():
         chart_labels=chart_labels,
         chart_intakes=chart_intakes,
         chart_releases=chart_releases,
-        chart_visitors=chart_visitors
+        chart_visitors=chart_visitors,
+        recent_medical_records=recent_medical_records,
+        medical_record_count=medical_record_count,
+        pending_medical_submission_count=pending_medical_submission_count,
+        recent_blacklist_events=recent_blacklist_events,
+        blacklist_incident_counts=blacklist_incident_counts,
+        blacklisted_visitor_count=blacklisted_visitor_count,
+        permanent_blacklist_threshold=VisitorService.PERMANENT_BLACKLIST_THRESHOLD,
+        can_view_visitor_blacklist=has_permission(Permissions.VISITOR_VIEW),
+        can_view_inmate_transfers=has_permission(Permissions.INMATE_VIEW),
+        recent_work_transfers=recent_work_transfers,
+        total_work_transfers=total_work_transfers,
+        recent_prison_transfers=recent_prison_transfers,
+        total_prison_transfers=total_prison_transfers,
     )

@@ -9,6 +9,7 @@ from models.edit_request import EditRequest
 from models.inmate import Inmate
 from models.visitor import Visitor
 from models.audit import AuditEvent
+from services.inmate_service import InmateService
 
 
 # Fields that can be edited and their type (for coercion on apply)
@@ -200,6 +201,21 @@ class EditRequestService:
             return False, f'Target {req.target_type.lower()} no longer exists.'
         if req.target_type == 'Inmate':
             target_id = target.inmate_id
+            if 'cell_block' in req.changes or 'security_classification' in req.changes:
+                proposed_cell = _coerce(
+                    req.changes['cell_block']['new'], str
+                ) if 'cell_block' in req.changes else target.cell_block
+                proposed_classification = _coerce(
+                    req.changes['security_classification']['new'], str
+                ) if 'security_classification' in req.changes else target.security_classification
+                cell_error = InmateService.validate_cell_assignment(
+                    proposed_cell or None,
+                    proposed_classification,
+                    medical_isolation_required=target.medical_isolation_required,
+                    exclude_inmate_id=target.inmate_id,
+                )
+                if cell_error:
+                    return False, cell_error
 
         # Apply each change
         for field, delta in req.changes.items():
