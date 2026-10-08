@@ -4,6 +4,7 @@ Population forecasting — pure Python rolling mean.
 No pandas required.
 """
 import logging
+from flask import current_app
 from datetime import date, timedelta
 from collections import Counter
 
@@ -17,21 +18,29 @@ logger = logging.getLogger(__name__)
 
 class PopulationForecaster:
 
-    DEFAULT_CAPACITY = 3000
+    DEFAULT_CAPACITY = 30000
     HISTORY_DAYS = 90
     WINDOW = 14
 
     @classmethod
     def forecast(cls, horizon_days=30, capacity=None):
-        capacity = capacity or cls.DEFAULT_CAPACITY
-        start = date.today() - timedelta(days=cls.HISTORY_DAYS)
+        if capacity is None:
+            capacity = current_app.config.get('FACILITY_CAPACITY', cls.DEFAULT_CAPACITY)
+        capacity = int(capacity)
+        if capacity <= 0:
+            raise ValueError('Facility capacity must be greater than zero.')
+
+        today = date.today()
+        start = today - timedelta(days=cls.HISTORY_DAYS)
 
         adm_rows = (db.session.query(AdmissionEpisode.admission_date)
-                    .filter(AdmissionEpisode.admission_date >= start)
+                    .filter(AdmissionEpisode.admission_date >= start,
+                            AdmissionEpisode.admission_date <= today)
                     .all())
         rel_rows = (db.session.query(AdmissionEpisode.release_date)
                     .filter(AdmissionEpisode.release_date.isnot(None),
-                            AdmissionEpisode.release_date >= start)
+                            AdmissionEpisode.release_date >= start,
+                            AdmissionEpisode.release_date <= today)
                     .all())
 
         adm_counts = Counter(d for (d,) in adm_rows)
@@ -40,14 +49,14 @@ class PopulationForecaster:
         # Build daily net series
         net_series = []
         d = start
-        while d <= date.today():
+        while d <= today:
             net_series.append(adm_counts.get(d, 0) - rel_counts.get(d, 0))
             d += timedelta(days=1)
 
         window = net_series[-cls.WINDOW:] if len(net_series) >= cls.WINDOW else net_series
         avg_net = (sum(window) / len(window)) if window else 0.0
 
-        current_pop = Inmate.query.filter_by(status='Active').count()
+        current_pop = Inmate.query.filter(Inmate.status == 'Active').count()
         predicted   = max(int(round(current_pop + avg_net * horizon_days)), 0)
 
         utilization = predicted / capacity if capacity else 0
@@ -60,7 +69,7 @@ class PopulationForecaster:
         avg_rel = (sum(rel_counts.values()) / max(len(net_series), 1))
 
         fc = PopulationForecast(
-            forecast_date=date.today() + timedelta(days=horizon_days),
+            forecast_date=today + timedelta(days=horizon_days),
             forecast_period=f'Next {horizon_days} days',
             predicted_population=predicted,
             predicted_admissions=int(avg_adm * horizon_days),
@@ -71,7 +80,7 @@ class PopulationForecaster:
             capacity_utilization=round(utilization * 100, 2),
             model_confidence=0.75,
             based_on_data_from=start,
-            based_on_data_to=date.today(),
+            based_on_data_to=today,
             generated_by_model='RollingMean-14d-py-v1.0',
         )
         db.session.add(fc)
@@ -108,7 +117,7 @@ class PopulationForecaster:
         db.session.commit()
 
         return {'success': True,
-                'forecast_date': (date.today() + timedelta(days=horizon_days)).isoformat(),
+                'forecast_date': (today + timedelta(days=horizon_days)).isoformat(),
                 'current_population': current_pop,
                 'predicted_population': predicted,
                 'capacity': capacity,

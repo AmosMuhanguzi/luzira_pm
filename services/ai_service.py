@@ -10,6 +10,7 @@ from sklearn.preprocessing import StandardScaler
 import joblib
 import os
 import logging
+from flask import current_app
 
 from models import db, Visitor, VisitLog, Inmate, AIAnalysisLog, VisitorPattern, PopulationForecast
 
@@ -45,7 +46,9 @@ class VisitorAnomalyDetector:
         
         visits = VisitLog.query.filter(
             VisitLog.visitor_id == visitor_id,
-            VisitLog.visit_date >= cutoff_date
+            VisitLog.check_in_time >= datetime.combine(
+                cutoff_date, datetime.min.time()
+            )
         ).order_by(VisitLog.visit_date).all()
         
         if len(visits) < 3:
@@ -288,7 +291,9 @@ class VisitorAnomalyDetector:
         # Check 3: Rapid succession visits
         recent_visits = VisitLog.query.filter(
             VisitLog.visitor_id == visitor_id,
-            VisitLog.visit_date >= date.today() - timedelta(days=1)
+            VisitLog.check_in_time >= datetime.combine(
+                date.today() - timedelta(days=1), datetime.min.time()
+            )
         ).count()
         
         if recent_visits >= 2:
@@ -299,7 +304,9 @@ class VisitorAnomalyDetector:
         recent_inmates = db.session.query(VisitLog.inmate_id)\
             .filter(
                 VisitLog.visitor_id == visitor_id,
-                VisitLog.visit_date >= date.today() - timedelta(days=7)
+                VisitLog.check_in_time >= datetime.combine(
+                    date.today() - timedelta(days=7), datetime.min.time()
+                )
             ).distinct().count()
         
         if recent_inmates >= 3:
@@ -393,14 +400,16 @@ class PopulationForecaster:
         """
         # Get historical admission and release data
         history_days = 90
-        start_date = date.today() - timedelta(days=history_days)
+        today = date.today()
+        start_date = today - timedelta(days=history_days)
         
         # Daily admissions
         admissions = db.session.query(
             AdmissionEpisode.admission_date,
             db.func.count(AdmissionEpisode.episode_id)
         ).filter(
-            AdmissionEpisode.admission_date >= start_date
+            AdmissionEpisode.admission_date >= start_date,
+            AdmissionEpisode.admission_date <= today
         ).group_by(AdmissionEpisode.admission_date).all()
         
         # Daily releases
@@ -409,7 +418,8 @@ class PopulationForecaster:
             db.func.count(AdmissionEpisode.episode_id)
         ).filter(
             AdmissionEpisode.release_date >= start_date,
-            AdmissionEpisode.release_date.isnot(None)
+            AdmissionEpisode.release_date.isnot(None),
+            AdmissionEpisode.release_date <= today
         ).group_by(AdmissionEpisode.release_date).all()
         
         # Create dataframes
@@ -417,7 +427,7 @@ class PopulationForecaster:
         release_df = pd.DataFrame(releases, columns=['date', 'releases'])
         
         # Merge and fill missing dates
-        date_range = pd.date_range(start=start_date, end=date.today())
+        date_range = pd.date_range(start=start_date, end=today)
         
         admission_df = admission_df.set_index('date').reindex(date_range, fill_value=0)
         release_df = release_df.set_index('date').reindex(date_range, fill_value=0)
@@ -426,17 +436,21 @@ class PopulationForecaster:
         daily_change = admission_df['admissions'] - release_df['releases']
         
         # Get current population
-        current_population = Inmate.query.filter_by(status='Active').count()
+        current_population = Inmate.query.filter(Inmate.status == 'Active').count()
         
         # Simple moving average forecast
         avg_daily_change = daily_change.rolling(window=14, min_periods=1).mean().iloc[-1]
         
         # Forecast
-        forecast_date = date.today() + timedelta(days=forecast_days)
-        predicted_population = current_population + (avg_daily_change * forecast_days)
-        
-        # Capacity (configurable - default 3000 for Luzira)
-        capacity = 3000
+        forecast_date = today + timedelta(days=forecast_days)
+        predicted_population = max(
+            int(round(current_population + (avg_daily_change * forecast_days))),
+            0,
+        )
+
+        capacity = current_app.config.get('FACILITY_CAPACITY', 30000)
+        if capacity <= 0:
+            raise ValueError('Facility capacity must be greater than zero.')
         
         # Overcrowding risk
         utilization = predicted_population / capacity
@@ -458,7 +472,7 @@ class PopulationForecaster:
         forecast = PopulationForecast(
             forecast_date=forecast_date,
             forecast_period=f'Next {forecast_days} days',
-            predicted_population=int(predicted_population),
+            predicted_population=predicted_population,
             predicted_admissions=int(admission_df['admissions'].mean() * forecast_days),
             predicted_releases=int(release_df['releases'].mean() * forecast_days),
             predicted_overcrowding_risk=overcrowding_risk,
@@ -467,7 +481,7 @@ class PopulationForecaster:
             capacity_utilization=utilization * 100,
             model_confidence=0.75,  # Based on data quality
             based_on_data_from=start_date,
-            based_on_data_to=date.today(),
+            based_on_data_to=today,
             generated_by_model='Moving Average v1.0'
         )
         
@@ -478,7 +492,7 @@ class PopulationForecaster:
             'success': True,
             'forecast_date': forecast_date.isoformat(),
             'current_population': current_population,
-            'predicted_population': int(predicted_population),
+            'predicted_population': predicted_population,
             'capacity': capacity,
             'utilization_percent': round(utilization * 100, 1),
             'overcrowding_risk': risk_level,

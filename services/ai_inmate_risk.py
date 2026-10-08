@@ -76,7 +76,7 @@ class InmateRiskScorer:
                                 ', '.join(f'{n} (+{p})' for n, p in factors) or 'none'),
                 detailed_result={'score': score, 'level': level,
                                  'factors': [{'name': n, 'points': p} for n, p in factors]},
-                confidence_score=1.0,
+                confidence_score=None,
                 severity=level if level in ('High', 'Critical') else 'Info',
                 recommended_action=cls._recommend(level, factors),
                 model_version='RuleBased-v1.0',

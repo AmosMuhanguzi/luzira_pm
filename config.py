@@ -39,7 +39,7 @@ class Config:
 
     # ---- Facility ----
     FACILITY_NAME = 'Luzira Prison'
-    FACILITY_CAPACITY = 3000
+    FACILITY_CAPACITY = 30000
 
     # config.py — inside class Config, in the Biometric section
     BIOMETRIC_MATCH_THRESHOLD = 75

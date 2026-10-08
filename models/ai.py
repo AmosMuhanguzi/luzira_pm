@@ -1,5 +1,6 @@
 # models/ai.py
-from datetime import datetime, date
+from datetime import datetime
+from sqlalchemy.orm import synonym
 from extensions import db
 from models.base import BaseModel
 
@@ -10,9 +11,11 @@ class AIAnalysisLog(BaseModel):
     analysis_id   = db.Column(db.Integer, primary_key=True, autoincrement=True)
     analysis_type = db.Column(db.String(50), nullable=False, index=True)
     target_entity = db.Column(db.String(50))
+    target_type   = synonym('target_entity')
     target_id     = db.Column(db.Integer)
 
     result_summary  = db.Column(db.Text, nullable=False)
+    result          = synonym('result_summary')
     detailed_result = db.Column(db.Text)   # JSON
     confidence_score = db.Column(db.Numeric(5, 4))
     anomaly_score    = db.Column(db.Numeric(5, 4))
@@ -29,6 +32,7 @@ class AIAnalysisLog(BaseModel):
     review_notes = db.Column(db.Text)
 
     analysis_timestamp = db.Column(db.DateTime, default=datetime.utcnow, index=True)
+    timestamp          = synonym('analysis_timestamp')
     model_version      = db.Column(db.String(20))
 
     @classmethod

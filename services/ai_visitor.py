@@ -1,16 +1,16 @@
 # services/ai_visitor.py
-"""
-Visitor anomaly detection — Pure Python Isolation Forest.
-No scikit-learn, numpy, or pandas required.
-The algorithm follows Liu, Ting & Zhou (2008) "Isolation Forest".
-"""
+"""Visitor anomaly detection using weekly frequency features and Isolation Forest."""
 import os
-import math
-import random
-import pickle
 import logging
+import tempfile
 from datetime import date, datetime, timedelta
-from collections import Counter
+from io import BytesIO
+
+import joblib
+import numpy as np
+import pandas as pd
+from matplotlib.backends.backend_agg import FigureCanvasAgg
+from matplotlib.figure import Figure
 
 from extensions import db
 from models.visitor import Visitor, VisitLog
@@ -19,8 +19,8 @@ from models.notification import Notification
 
 logger = logging.getLogger(__name__)
 
-MODEL_DIR   = 'ml_models'
-MODEL_PATH  = os.path.join(MODEL_DIR, 'visitor_anomaly_model.pkl')
+MODEL_DIR   = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'ml_models')
+MODEL_PATH  = os.path.join(MODEL_DIR, 'visitor_anomaly_model.joblib')
 
 MIN_VISITORS_TO_TRAIN   = 10
 MIN_VISITS_PER_VISITOR  = 3
@@ -29,135 +29,16 @@ LOOKBACK_DAYS           = 180
 N_ESTIMATORS            = 100
 MAX_SAMPLES             = 256
 RANDOM_SEED             = 42
+WEEK_BUCKETS = (LOOKBACK_DAYS + 6) // 7
 
 
-# =====================================================================
-# Core Isolation Forest (pure Python)
-# =====================================================================
-def _c(n):
-    """Average path length of unsuccessful BST search — HF correction factor."""
-    if n <= 1:
-        return 0.0
-    return 2.0 * (math.log(n - 1) + 0.5772156649) - 2.0 * (n - 1) / n
-
-
-class _Node:
-    __slots__ = ('size', 'feature', 'split', 'left', 'right', 'is_external')
-    def __init__(self, size, feature=None, split=None,
-                 left=None, right=None, is_external=False):
-        self.size = size
-        self.feature = feature
-        self.split = split
-        self.left = left
-        self.right = right
-        self.is_external = is_external
-
-
-def _build_tree(X, indices, depth, max_depth, rng):
-    n = len(indices)
-    if depth >= max_depth or n <= 1:
-        return _Node(size=n, is_external=True)
-
-    d = len(X[0])
-    varying = [f for f in range(d)
-               if min(X[i][f] for i in indices) != max(X[i][f] for i in indices)]
-    if not varying:
-        return _Node(size=n, is_external=True)
-
-    f = rng.choice(varying)
-    lo = min(X[i][f] for i in indices)
-    hi = max(X[i][f] for i in indices)
-    split = rng.uniform(lo, hi)
-
-    left  = [i for i in indices if X[i][f] <  split]
-    right = [i for i in indices if X[i][f] >= split]
-    if not left or not right:
-        return _Node(size=n, is_external=True)
-
-    return _Node(
-        size=n, feature=f, split=split,
-        left=_build_tree(X, left,  depth + 1, max_depth, rng),
-        right=_build_tree(X, right, depth + 1, max_depth, rng),
-    )
-
-
-def _path_length(x, node, depth=0):
-    if node.is_external:
-        return depth + _c(node.size)
-    if x[node.feature] < node.split:
-        return _path_length(x, node.left,  depth + 1)
-    return _path_length(x, node.right, depth + 1)
-
-
-class PurePythonIsolationForest:
-    """Minimal Isolation Forest — sklearn-compatible predict() convention."""
-
-    def __init__(self, n_estimators=N_ESTIMATORS, max_samples=MAX_SAMPLES,
-                 contamination=CONTAMINATION, random_state=RANDOM_SEED):
-        self.n_estimators  = n_estimators
-        self.max_samples   = max_samples
-        self.contamination = contamination
-        self.seed          = random_state
-        self.trees         = []
-        self.threshold_    = 0.5
-
-    def fit(self, X):
-        n = len(X)
-        if n == 0:
-            return self
-        sample_size = min(self.max_samples, n)
-        max_depth   = max(1, int(math.ceil(math.log2(sample_size)))) if sample_size > 1 else 1
-        rng = random.Random(self.seed)
-
-        self.trees = []
-        for _ in range(self.n_estimators):
-            idx = rng.sample(range(n), sample_size)
-            self.trees.append(_build_tree(X, idx, 0, max_depth, rng))
-
-        scores = [self._score(x) for x in X]
-        scores_sorted = sorted(scores)
-        k = int(self.contamination * n)
-        if k > 0 and k < n:
-            self.threshold_ = scores_sorted[n - k]
-        else:
-            self.threshold_ = max(scores) if scores else 0.5
-        return self
-
-    def _score(self, x):
-        if not self.trees:
-            return 0.5
-        avg = sum(_path_length(x, t) for t in self.trees) / len(self.trees)
-        sample_size = max(2, min(self.max_samples,
-                                 max(t.size for t in self.trees)))
-        cn = _c(sample_size) or 1.0
-        return 2 ** (-avg / cn)
-
-    def predict(self, X):
-        """-1 = anomaly, 1 = normal (sklearn convention)."""
-        return [-1 if self._score(x) >= self.threshold_ else 1 for x in X]
-
-
-class PurePythonScaler:
-    """Z-score standardiser — replaces sklearn.preprocessing.StandardScaler."""
-    def __init__(self):
-        self.mean_ = []
-        self.std_  = []
-
-    def fit(self, X):
-        n = len(X)
-        if n == 0:
-            return self
-        d = len(X[0])
-        self.mean_ = [sum(row[j] for row in X) / n for j in range(d)]
-        self.std_ = []
-        for j in range(d):
-            var = sum((row[j] - self.mean_[j]) ** 2 for row in X) / n
-            self.std_.append(math.sqrt(var) if var > 0 else 1.0)
-        return self
-
-    def transform(self, X):
-        return [[(row[j] - self.mean_[j]) / (self.std_[j] or 1.0)
-                 for j in range(len(row))] for row in X]
+def _load_sklearn_components():
+    try:
+        from sklearn.ensemble import IsolationForest
+        from sklearn.preprocessing import StandardScaler
+    except ImportError as error:
+        return None, None, error
+    return IsolationForest, StandardScaler, None
 
 
 # =====================================================================
@@ -168,27 +49,30 @@ class VisitorAnomalyDetector:
     # ---------------- feature extraction ----------------
     @classmethod
     def prepare_features(cls, visitor_id, lookback_days=LOOKBACK_DAYS):
-        cutoff = date.today() - timedelta(days=lookback_days)
+        today = date.today()
+        cutoff = today - timedelta(days=lookback_days)
+        cutoff_at = datetime.combine(cutoff, datetime.min.time())
         visits = (VisitLog.query
                   .filter(VisitLog.visitor_id == visitor_id,
-                          VisitLog.visit_date >= cutoff)
-                  .order_by(VisitLog.visit_date).all())
+                          VisitLog.check_in_time >= cutoff_at)
+                  .order_by(VisitLog.check_in_time).all())
         if len(visits) < MIN_VISITS_PER_VISITOR:
             return None
 
-        dates = [v.visit_date for v in visits]
+        dates = [v.check_in_time.date() for v in visits if v.check_in_time]
+        if len(dates) < MIN_VISITS_PER_VISITOR:
+            return None
         span  = max((dates[-1] - dates[0]).days, 1)
-        freq  = len(visits) / (span / 7.0)
+        freq  = len(dates) / (span / 7.0)
 
-        durations = [v.visit_duration_minutes for v in visits if v.visit_duration_minutes]
-        avg_dur   = sum(durations) / len(durations) if durations else 0.0
+        durations = [
+            v.duration_minutes for v in visits
+            if v.duration_minutes is not None
+        ]
+        avg_dur   = float(np.mean(durations)) if durations else 0.0
 
         gaps = [(dates[i+1] - dates[i]).days for i in range(len(dates) - 1)]
-        if gaps:
-            mean_gap = sum(gaps) / len(gaps)
-            gap_var  = sum((g - mean_gap) ** 2 for g in gaps) / len(gaps)
-        else:
-            gap_var = 0.0
+        gap_var = float(np.var(gaps)) if gaps else 0.0
 
         unique_inmates = len({v.inmate_id for v in visits})
 
@@ -197,28 +81,51 @@ class VisitorAnomalyDetector:
         unusual_ratio = unusual / len(visits)
 
         items_count = sum(1 for v in visits if v.items_brought)
-        days_first  = (date.today() - dates[0]).days
+        days_first  = (today - dates[0]).days
 
         dow = [d.weekday() for d in dates]
-        if len(dow) > 1:
-            mean_dow = sum(dow) / len(dow)
-            dow_std  = math.sqrt(sum((x - mean_dow) ** 2 for x in dow) / len(dow))
-        else:
-            dow_std = 0.0
+        dow_std = float(np.std(dow)) if len(dow) > 1 else 0.0
 
-        counts = Counter(v.inmate_id for v in visits)
-        max_single = max(counts.values()) if counts else 0
+        counts = pd.Series([v.inmate_id for v in visits]).value_counts()
+        max_single = int(counts.max()) if not counts.empty else 0
         concentration = max_single / len(visits)
 
-        recent_anom = sum(1 for v in visits if v.anomaly_flagged)
+        recent_anom = sum(1 for v in visits if getattr(v, 'anomaly_flag', False))
 
-        return [freq, avg_dur, gap_var, unique_inmates,
-                unusual_ratio, items_count, days_first,
-                dow_std, concentration, recent_anom]
+        visit_times = pd.DatetimeIndex(
+            v.check_in_time for v in visits if v.check_in_time
+        )
+        week_numbers = (
+            (visit_times.normalize() - pd.Timestamp(cutoff)).days // 7
+        )
+        weekly_counts = (
+            pd.Series(1, index=week_numbers, dtype='int64')
+            .groupby(level=0)
+            .sum()
+            .reindex(range(WEEK_BUCKETS), fill_value=0)
+        )
+        weekly_features = weekly_counts.to_numpy(dtype=np.float64).tolist()
+
+        return [
+            freq, avg_dur, gap_var, unique_inmates,
+            unusual_ratio, items_count, days_first,
+            dow_std, concentration, recent_anom,
+            *weekly_features,
+        ]
 
     # ---------------- training ----------------
     @classmethod
     def train_model(cls):
+        isolation_forest, standard_scaler, import_error = _load_sklearn_components()
+        if import_error:
+            return {
+                'success': False,
+                'error': (
+                    'scikit-learn could not be loaded because one of its native '
+                    f'dependencies failed: {import_error}'
+                ),
+            }
+
         rows = []
         for v in Visitor.query.all():
             f = cls.prepare_features(v.visitor_id)
@@ -234,67 +141,161 @@ class VisitorAnomalyDetector:
                 'samples': len(rows),
             }
 
-        scaler = PurePythonScaler().fit(rows)
-        Xs = scaler.transform(rows)
-
-        model = PurePythonIsolationForest(
-            n_estimators=N_ESTIMATORS, max_samples=MAX_SAMPLES,
-            contamination=CONTAMINATION, random_state=RANDOM_SEED,
+        feature_matrix = np.asarray(rows, dtype=np.float64)
+        scaler = standard_scaler().fit(feature_matrix)
+        Xs = scaler.transform(feature_matrix)
+        model = isolation_forest(
+            n_estimators=N_ESTIMATORS,
+            max_samples=min(MAX_SAMPLES, len(rows)),
+            contamination=CONTAMINATION,
+            random_state=RANDOM_SEED,
         ).fit(Xs)
+        model.training_scores_ = np.sort(model.decision_function(Xs))
 
         os.makedirs(MODEL_DIR, exist_ok=True)
-        with open(MODEL_PATH, 'wb') as fh:
-            pickle.dump({'model': model, 'scaler': scaler}, fh)
+        bundle = {
+            'model': model,
+            'scaler': scaler,
+            'feature_version': 2,
+            'trained_at': datetime.utcnow().isoformat(),
+            'training_samples': len(rows),
+        }
+        temporary_path = None
+        try:
+            with tempfile.NamedTemporaryFile(
+                dir=MODEL_DIR,
+                prefix='.visitor-anomaly-',
+                suffix='.tmp',
+                delete=False,
+            ) as temporary_file:
+                temporary_path = temporary_file.name
+            joblib.dump(bundle, temporary_path)
+            os.replace(temporary_path, MODEL_PATH)
+            temporary_path = None
+        except OSError as error:
+            logger.exception('Could not save the trained visitor anomaly model.')
+            return {
+                'success': False,
+                'error': f'Could not save the trained visitor anomaly model: {error}',
+            }
+        finally:
+            if temporary_path and os.path.exists(temporary_path):
+                os.unlink(temporary_path)
 
         AIAnalysisLog.log_analysis(
             analysis_type='ModelTraining',
             target_entity='System',
             target_id=None,
             result_summary=f'Visitor anomaly model trained on {len(rows)} samples',
+            detailed_result={
+                'algorithm': 'sklearn.ensemble.IsolationForest',
+                'feature_set': '180-day weekly visit-frequency time series plus behavior indicators',
+                'contamination': CONTAMINATION,
+                'training_samples': len(rows),
+            },
             confidence_score=None,
             severity='Info',
             recommended_action='None',
-            model_version='PurePythonIF-v1.0',
+            model_version='SklearnIF-Weekly-v2.0',
         )
         db.session.commit()
 
-        return {'success': True, 'samples': len(rows)}
+        return {
+            'success': True,
+            'samples': len(rows),
+            'algorithm': 'scikit-learn Isolation Forest',
+            'feature_version': 2,
+        }
 
     # ---------------- analysis ----------------
     @classmethod
     def _load(cls):
+        _, _, import_error = _load_sklearn_components()
+        if import_error:
+            raise RuntimeError(
+                'scikit-learn could not be loaded because one of its native '
+                f'dependencies failed: {import_error}'
+            )
         if not os.path.exists(MODEL_PATH):
             return None, None
-        with open(MODEL_PATH, 'rb') as fh:
-            bundle = pickle.load(fh)
+        if os.path.getsize(MODEL_PATH) == 0:
+            logger.warning(
+                'Visitor anomaly model artifact is empty; it will be retrained.'
+            )
+            return None, None
+        try:
+            bundle = joblib.load(MODEL_PATH)
+        except (EOFError, OSError, ValueError, KeyError, AttributeError, ImportError) as error:
+            logger.warning(
+                'Visitor anomaly model artifact is unreadable and will be retrained: %s',
+                error,
+            )
+            return None, None
+        if not isinstance(bundle, dict):
+            logger.warning(
+                'Visitor anomaly model artifact has an invalid structure; it will be retrained.'
+            )
+            return None, None
+        if bundle.get('feature_version') != 2:
+            logger.warning(
+                'Stored visitor model feature version is unsupported; it will be retrained.'
+            )
+            return None, None
+        if 'model' not in bundle or 'scaler' not in bundle:
+            logger.warning(
+                'Visitor anomaly model artifact is incomplete; it will be retrained.'
+            )
+            return None, None
         return bundle['model'], bundle['scaler']
 
     @classmethod
     def analyze_visitor(cls, visitor_id, model=None, scaler=None):
         if model is None or scaler is None:
-            model, scaler = cls._load()
+            try:
+                model, scaler = cls._load()
+            except RuntimeError as error:
+                return {'success': False, 'error': str(error)}
             if model is None:
-                return {'success': False, 'error': 'Model not trained yet.'}
+                training = cls.train_model()
+                if not training.get('success'):
+                    return {
+                        'success': False,
+                        'error': training.get(
+                            'error',
+                            'Visitor anomaly model is unavailable and could not be retrained.',
+                        ),
+                    }
+                try:
+                    model, scaler = cls._load()
+                except RuntimeError as error:
+                    return {'success': False, 'error': str(error)}
+                if model is None:
+                    return {
+                        'success': False,
+                        'error': 'Visitor anomaly model training completed, but the saved model could not be loaded.',
+                    }
 
         f = cls.prepare_features(visitor_id)
         if f is None:
             return {'success': False, 'error': 'Not enough visit history.',
                     'visitor_id': visitor_id}
 
-        scaled = scaler.transform([f])[0]
-        is_anomaly = model.predict([scaled])[0] == -1
-        raw_score  = model._score(scaled)
-        # Normalise: scores > threshold are anomalies.
-        # Map to a 0..1 anomaly-intensity measure anchored at the threshold.
-        if model.threshold_ < 1.0:
-            anomaly_score = max(0.0, (raw_score - model.threshold_) / (1 - model.threshold_))
+        scaled = scaler.transform(np.asarray([f], dtype=np.float64))
+        is_anomaly = bool(model.predict(scaled)[0] == -1)
+        decision_score = float(model.decision_function(scaled)[0])
+        training_scores = getattr(model, 'training_scores_', np.array([]))
+        if len(training_scores):
+            lower_tail_rank = np.searchsorted(
+                training_scores, decision_score, side='left'
+            ) / len(training_scores)
+            anomaly_score = float(np.clip(1.0 - lower_tail_rank, 0.0, 1.0))
         else:
-            anomaly_score = 0.0
+            anomaly_score = float(is_anomaly)
 
-        if anomaly_score >= 0.5:     severity = 'Critical'
-        elif anomaly_score >= 0.25:  severity = 'High'
-        elif anomaly_score >= 0.10:  severity = 'Medium'
-        else:                        severity = 'Low'
+        if is_anomaly and anomaly_score >= 0.99: severity = 'Critical'
+        elif is_anomaly and anomaly_score >= 0.97: severity = 'High'
+        elif is_anomaly:                          severity = 'Medium'
+        else:                                     severity = 'Low'
 
         reason = cls._reason(f)
 
@@ -302,7 +303,6 @@ class VisitorAnomalyDetector:
         if visitor:
             visitor.anomaly_score      = round(anomaly_score, 4)
             visitor.anomaly_flag       = is_anomaly
-            visitor.last_anomaly_check = datetime.utcnow()
             db.session.commit()
 
         cls._update_pattern(visitor_id, f, is_anomaly)
@@ -313,14 +313,19 @@ class VisitorAnomalyDetector:
             target_id=visitor_id,
             result_summary=(f'{"Anomaly" if is_anomaly else "Normal"}: {reason}'),
             detailed_result={'features': f,
-                             'raw_score': round(raw_score, 4),
-                             'anomaly_score': round(anomaly_score, 4),
+                             'weekly_visit_counts': f[10:],
+                             'model_decision_score': round(decision_score, 6),
+                             'statistical_risk_index': round(anomaly_score, 4),
+                             'risk_interpretation': (
+                                 'Unsupervised activity-pattern screening index; '
+                                 'not a calibrated probability of contraband smuggling.'
+                             ),
                              'severity': severity},
-            confidence_score=round(anomaly_score, 4),
+            confidence_score=None,
             anomaly_score=round(anomaly_score, 4),
             severity=severity if is_anomaly else 'Info',
             recommended_action=cls._action(severity) if is_anomaly else 'Continue monitoring.',
-            model_version='PurePythonIF-v1.0',
+            model_version='SklearnIF-Weekly-v2.0',
         )
 
         if is_anomaly and severity in ('High', 'Critical') and visitor:
@@ -340,9 +345,29 @@ class VisitorAnomalyDetector:
 
     @classmethod
     def analyze_all(cls):
-        model, scaler = cls._load()
+        try:
+            model, scaler = cls._load()
+        except RuntimeError as error:
+            return {'success': False, 'error': str(error)}
         if model is None:
-            return {'success': False, 'error': 'Model not trained yet.'}
+            training = cls.train_model()
+            if not training.get('success'):
+                return {
+                    'success': False,
+                    'error': training.get(
+                        'error',
+                        'Visitor anomaly model is unavailable and could not be retrained.',
+                    ),
+                }
+            try:
+                model, scaler = cls._load()
+            except RuntimeError as error:
+                return {'success': False, 'error': str(error)}
+            if model is None:
+                return {
+                    'success': False,
+                    'error': 'Visitor anomaly model training completed, but the saved model could not be loaded.',
+                }
 
         analyzed = flagged = skipped = 0
         for v in Visitor.query.all():
@@ -384,7 +409,10 @@ class VisitorAnomalyDetector:
 
         unique_inmates_7d = (db.session.query(VisitLog.inmate_id)
                              .filter(VisitLog.visitor_id == visitor_id,
-                                     VisitLog.visit_date >= date.today() - timedelta(days=7))
+                                     VisitLog.check_in_time >= datetime.combine(
+                                         date.today() - timedelta(days=7),
+                                         datetime.min.time(),
+                                     ))
                              .distinct().count())
         if unique_inmates_7d >= 3:
             reasons.append(f'Visiting {unique_inmates_7d} different inmates in 7 days')
@@ -417,14 +445,16 @@ class VisitorAnomalyDetector:
         if f[3] > 5:    reasons.append('visiting unusually many inmates')
         if f[8] < 0.3:  reasons.append('no clear primary inmate association')
         if f[9] > 0:    reasons.append('prior flagged visits')
+        if len(f) > 17 and sum(f[-4:]) > sum(f[-8:-4]):
+            reasons.append('recent weekly visit frequency is increasing')
         return '; '.join(reasons) if reasons else 'statistical anomaly in visit pattern'
 
     @classmethod
     def _action(cls, severity):
         return {
-            'Critical': 'Deny entry; escalate to Warden for investigation.',
-            'High':     'Additional security screening required before entry.',
-            'Medium':   'Flag for security officer attention during visit.',
+            'Critical': 'Immediate human review and secondary screening by security.',
+            'High':     'Review visitor history and apply additional security screening.',
+            'Medium':   'Flag for security officer attention during the visit.',
             'Low':      'Continue monitoring.',
         }.get(severity, 'Continue monitoring.')
 
@@ -444,3 +474,46 @@ class VisitorAnomalyDetector:
             p.last_flagged_date = date.today()
         p.calculated_at = datetime.utcnow()
         db.session.commit()
+
+    @classmethod
+    def weekly_activity_chart(cls):
+        """Return an in-memory PNG of weekly visitor visit counts."""
+        start = date.today() - timedelta(weeks=12)
+        rows = db.session.query(VisitLog.check_in_time).filter(
+            VisitLog.check_in_time >= datetime.combine(
+                start, datetime.min.time()
+            )
+        ).all()
+        timestamps = [timestamp for (timestamp,) in rows if timestamp]
+        if timestamps:
+            visits = pd.Series(
+                1, index=pd.DatetimeIndex(timestamps), dtype='int64'
+            ).resample('W-SUN').sum()
+        else:
+            visits = pd.Series(dtype='int64')
+        weekly_index = pd.date_range(
+            start=pd.Timestamp(start),
+            end=pd.Timestamp(date.today()),
+            freq='W-SUN',
+        )
+        visits = visits.reindex(weekly_index, fill_value=0)
+
+        figure = Figure(figsize=(9, 3.2), tight_layout=True)
+        axis = figure.subplots()
+        axis.plot(
+            visits.index,
+            visits.to_numpy(dtype=np.int64),
+            color='#0d6efd',
+            marker='o',
+            linewidth=2,
+        )
+        axis.set_title('Visitor Check-ins per Week')
+        axis.set_ylabel('Visits')
+        axis.set_xlabel('Week')
+        axis.grid(True, alpha=0.25)
+        figure.autofmt_xdate()
+
+        image = BytesIO()
+        FigureCanvasAgg(figure).print_png(image)
+        image.seek(0)
+        return image

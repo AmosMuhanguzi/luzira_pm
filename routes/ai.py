@@ -1,13 +1,13 @@
 # routes/ai.py
 from datetime import datetime
-from flask import (Blueprint, render_template, redirect, url_for,
-                   flash, request, jsonify)
+import json
+from flask import (Blueprint, current_app, render_template, redirect, url_for,
+                   flash, request, send_file)
 from flask_login import login_required, current_user
 
 from extensions import csrf, db
 from services.rbac import require_permission, Permissions
 from models.ai import AIAnalysisLog
-from models.notification import Notification
 from models.visitor import Visitor
 from models.inmate import Inmate
 
@@ -25,6 +25,7 @@ def dashboard():
     total_visitors   = Visitor.query.count()
     flagged_visitors = Visitor.query.filter_by(anomaly_flag=True).count()
     high_risk_inmates = Inmate.query.filter(Inmate.risk_level.in_(['High','Critical'])).count()
+    current_population = Inmate.query.filter_by(status='Active').count()
 
     # Latest forecast
     from models.ai import PopulationForecast
@@ -51,9 +52,26 @@ def dashboard():
                            total_visitors=total_visitors,
                            flagged_visitors=flagged_visitors,
                            high_risk_inmates=high_risk_inmates,
+                           current_population=current_population,
+                           facility_capacity=current_app.config.get('FACILITY_CAPACITY', 30000),
                            latest_forecast=latest_forecast,
                            alerts=alerts,
                            risk_counts=risk_counts)
+
+
+@ai_bp.route('/charts/visitor-frequency.png')
+@login_required
+@require_permission(Permissions.AI_VIEW_DASHBOARD)
+def visitor_frequency_chart():
+    from services.ai_visitor import VisitorAnomalyDetector
+
+    chart = VisitorAnomalyDetector.weekly_activity_chart()
+    return send_file(
+        chart,
+        mimetype='image/png',
+        download_name='visitor-weekly-frequency.png',
+        max_age=0,
+    )
 
 
 # ---------- Alerts list ----------
@@ -84,6 +102,12 @@ def alerts():
 @require_permission(Permissions.AI_VIEW_ALERTS)
 def alert_detail(alert_id):
     alert = AIAnalysisLog.query.get_or_404(alert_id)
+    alert_details = None
+    if alert.detailed_result:
+        try:
+            alert_details = json.loads(alert.detailed_result)
+        except json.JSONDecodeError:
+            alert_details = None
 
     target = None
     if alert.target_entity == 'Visitor' and alert.target_id:
@@ -91,7 +115,12 @@ def alert_detail(alert_id):
     elif alert.target_entity == 'Inmate' and alert.target_id:
         target = Inmate.query.get(alert.target_id)
 
-    return render_template('ai/alert_detail.html', alert=alert, target=target)
+    return render_template(
+        'ai/alert_detail.html',
+        alert=alert,
+        target=target,
+        alert_details=alert_details,
+    )
 
 
 @ai_bp.route('/alerts/<int:alert_id>/review', methods=['POST'])
@@ -177,7 +206,9 @@ def weekly_report():
 
     new_inmates = Inmate.query.filter(Inmate.created_at >= week_ago).count()
     new_visitors = Visitor.query.filter(Visitor.created_at >= week_ago).count()
-    week_visits  = VisitLog.query.filter(VisitLog.visit_date >= week_ago).count()
+    week_visits  = VisitLog.query.filter(
+        VisitLog.check_in_time >= datetime.combine(week_ago, datetime.min.time())
+    ).count()
     flagged      = Visitor.query.filter_by(anomaly_flag=True).count()
     risk_counts  = {'Low': 0, 'Medium': 0, 'High': 0, 'Critical': 0}
     rows = (db.session.query(Inmate.risk_level, db.func.count(Inmate.inmate_id))
@@ -191,5 +222,3 @@ def weekly_report():
                            new_inmates=new_inmates, new_visitors=new_visitors,
                            week_visits=week_visits, flagged=flagged,
                            risk_counts=risk_counts)
-
-

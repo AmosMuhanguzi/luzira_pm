@@ -61,6 +61,9 @@
                 <a href="{{ url_for('inmate.list_inmates') }}" class="btn btn-sm btn-outline-primary"><img class="inmate-icon" src="{{ url_for('static', filename='images/inmate-icon.png') }}" alt=""> Inmate Records</a>
                 <a href="{{ url_for('edit_requests.my_requests') }}" class="btn btn-sm btn-outline-info"><i class="bi bi-send-check"></i> My Requests</a>
                 <a href="{{ url_for('visitor.scan') }}" class="btn btn-sm btn-outline-success"><img class="visitor-icon" src="{{ url_for('static', filename='images/visitor-icon.png') }}" alt=""> Visitor Check-in</a>
+                {% if has_permission(Permissions.AI_VIEW_DASHBOARD) %}
+                <a href="{{ url_for('ai.dashboard') }}" class="btn btn-sm btn-outline-dark"><i class="bi bi-robot"></i> AI Analytics</a>
+                {% endif %}
 
             {% elif role == 'Security Officer' %}
                 <a href="{{ url_for('edit_requests.my_requests') }}" class="btn btn-sm btn-outline-warning"><i class="bi bi-send-check"></i> My Requests</a>

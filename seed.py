@@ -53,15 +53,18 @@ def seed():
         # ---- Facility settings ----
         defaults = [
             ('facility_name',          'Luzira Prison', 'string'),
-            ('facility_capacity',      '3000',          'integer'),
+            ('facility_capacity',      '30000',         'integer'),
             ('biometric_threshold',    '75',            'integer'),
             ('ai_anomaly_enabled',     'true',          'boolean'),
         ]
         for key, val, typ in defaults:
-            if not SystemSetting.query.filter_by(setting_key=key).first():
+            setting = SystemSetting.query.filter_by(setting_key=key).first()
+            if not setting:
                 db.session.add(SystemSetting(
                     setting_key=key, setting_value=val, setting_type=typ
                 ))
+            elif key == 'facility_capacity' and setting.setting_value == '3000':
+                setting.setting_value = val
 
         db.session.commit()
         print('Database seeded successfully.')

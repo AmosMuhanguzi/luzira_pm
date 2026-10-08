@@ -146,7 +146,7 @@
                 </li>
                 {% endif %}
 
-                 {% if current_user.role_name in ['System Administrator', 'Warden'] %}
+                 {% if has_permission(Permissions.AI_VIEW_DASHBOARD) %}
                 <li class="nav-item">
                     <a class="nav-link" href="{{ url_for('ai.dashboard') }}">
                         <i class="bi bi-robot"></i> AI Analytics

@@ -5,7 +5,10 @@
 <div class="d-flex justify-content-between align-items-center mb-4">
     <div>
         <h2 class="mb-1"><i class="bi bi-robot"></i> AI Analytics</h2>
-        <p class="text-muted mb-0">Anomaly detection · Population forecasting · Risk profiling</p>
+        <p class="text-muted mb-0">
+            scikit-learn · pandas · NumPy · Matplotlib
+            <span class="d-block">Isolation Forest anomaly detection · Visitor smuggling-risk screening · Population forecasting · Inmate behavioral risk scoring</span>
+        </p>
     </div>
     <div class="d-flex gap-2">
         <form method="POST" action="{{ url_for('ai.train_model') }}" class="d-inline">
@@ -21,6 +24,11 @@
         <form method="POST" action="{{ url_for('ai.run_population_forecast') }}" class="d-inline">
             <button class="btn btn-outline-info btn-sm">
                 <i class="bi bi-graph-up"></i> Forecast
+            </button>
+        </form>
+        <form method="POST" action="{{ url_for('ai.run_inmate_risk') }}" class="d-inline">
+            <button class="btn btn-outline-danger btn-sm">
+                <i class="bi bi-shield-check"></i> Score Inmate Risk
             </button>
         </form>
         <a href="{{ url_for('ai.weekly_report') }}" class="btn btn-outline-secondary btn-sm">
@@ -59,12 +67,59 @@
         <div class="card bg-info text-white h-100">
             <div class="card-body">
                 <h6 class="text-uppercase small opacity-75">Current Population</h6>
-                <h2>{{ latest_forecast.current_capacity if latest_forecast else '—' }}</h2>
+                <h2>{{ current_population }} / {{ facility_capacity }}</h2>
                 <small class="opacity-75">
+                    Active inmates only; released and transferred inmates are excluded.
                     {% if latest_forecast %}
-                    Forecast: {{ latest_forecast.predicted_population }} ({{ latest_forecast.capacity_utilization }}%)
+                    <br>Latest forecast: {{ latest_forecast.predicted_population }} ({{ latest_forecast.capacity_utilization }}%)
                     {% endif %}
                 </small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="alert alert-info small mb-4" role="note">
+    Visitor anomaly scores are statistical screening indicators based on visit history,
+    including the 26-week frequency pattern. They are not calibrated probabilities
+    that a visitor will smuggle contraband and must not be used alone to make access decisions.
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-lg-8">
+        <div class="card shadow-sm border-0 h-100">
+            <div class="card-header bg-dark text-white">
+                <i class="bi bi-graph-up"></i> Visitor Frequency Time Series
+            </div>
+            <div class="card-body">
+                <img
+                    src="{{ url_for('ai.visitor_frequency_chart') }}"
+                    class="img-fluid w-100"
+                    alt="Weekly visitor check-in counts over the last 12 weeks">
+                <p class="small text-muted mb-0">
+                    Weekly check-in counts for the last 12 weeks; used with visit behavior indicators in anomaly screening.
+                </p>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-4">
+        <div class="card shadow-sm border-0 h-100">
+            <div class="card-header bg-dark text-white">
+                <i class="bi bi-cpu"></i> Analysis methods
+            </div>
+            <div class="card-body">
+                <dl class="row small mb-0">
+                    <dt class="col-6">Visitor anomaly</dt>
+                    <dd class="col-6">Isolation Forest</dd>
+                    <dt class="col-6">Visitor history</dt>
+                    <dd class="col-6">26 weekly buckets + behavior features</dd>
+                    <dt class="col-6">Inmate risk</dt>
+                    <dd class="col-6">Explainable rules from disciplinary and custody history</dd>
+                    <dt class="col-6">Population</dt>
+                    <dd class="col-6">Admission/release trend forecast</dd>
+                    <dt class="col-6">Outputs</dt>
+                    <dd class="col-6">Timestamped AI analysis logs and reviewable alerts</dd>
+                </dl>
             </div>
         </div>
     </div>
