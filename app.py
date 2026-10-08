@@ -29,7 +29,8 @@ def create_app(config_name=None):
     with app.app_context():
         from models import (  # noqa: F401
             Role, UserAccount, Inmate, AdmissionEpisode,
-            Visitor, VisitLog, MedicalRecord, DisciplinaryLog,
+            Visitor, VisitLog, MedicalRecord, DisciplinaryLog, EscapeAttemptLog,
+            WorkTransferLog,
             AIAnalysisLog, VisitorPattern, PopulationForecast,
             AuditEvent, Notification, SystemSetting,
         )

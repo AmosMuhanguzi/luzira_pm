@@ -90,6 +90,14 @@ class Inmate(BaseModel):
         'DisciplinaryLog', back_populates='inmate',
         cascade='all, delete-orphan', lazy='dynamic'
     )
+    escape_attempt_logs = db.relationship(
+        'EscapeAttemptLog', back_populates='inmate',
+        cascade='all, delete-orphan', lazy='dynamic'
+    )
+    work_transfer_logs = db.relationship(
+        'WorkTransferLog', back_populates='inmate',
+        cascade='all, delete-orphan', lazy='dynamic'
+    )
     visit_logs = db.relationship(
         'VisitLog', back_populates='inmate', lazy='dynamic'
     )
@@ -161,6 +169,7 @@ class AdmissionEpisode(BaseModel):
     admission_type   = db.Column(db.String(20), nullable=False)  # New / Re-admission / Transfer-In
     admission_reason = db.Column(db.Text)
     releasing_facility = db.Column(db.String(100))
+    transfer_to = db.Column(db.String(100))
 
     receiving_officer_id = db.Column(db.Integer, db.ForeignKey('user_accounts.user_id'))
 
@@ -179,5 +188,3 @@ class AdmissionEpisode(BaseModel):
 
     def __repr__(self):
         return f'<Episode {self.episode_id} inmate={self.inmate_id} type={self.admission_type}>'
-
-

@@ -8,8 +8,44 @@ body {
 }
 
 .navbar-brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
     font-weight: 600;
     letter-spacing: 0.5px;
+}
+
+.navbar-brand-logo {
+    display: block;
+    width: 1.65rem;
+    height: 1.65rem;
+    object-fit: contain;
+}
+
+.navbar-dashboard-icon {
+    width: 1.25rem;
+    height: 1.25rem;
+    margin-right: 0.15rem;
+    object-fit: contain;
+    vertical-align: -0.2rem;
+}
+
+.staff-icon {
+    width: 1.25rem;
+    height: 1.25rem;
+    margin-right: 0.15rem;
+    object-fit: contain;
+    vertical-align: -0.2rem;
+}
+
+.staff-icon--nav {
+    width: 1rem;
+    height: 1rem;
+}
+
+.staff-icon--heading {
+    width: 1.65rem;
+    height: 1.65rem;
 }
 
 .alert {

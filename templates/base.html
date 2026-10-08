@@ -44,7 +44,10 @@
 
         {# --- Brand --- #}
         <a class="navbar-brand" href="{{ url_for('auth.dashboard') }}">
-            <i class="bi bi-shield-lock-fill"></i> Luzira PMS
+            <img class="navbar-brand-logo"
+                 src="{{ url_for('static', filename='images/luzira-prison-logo.png') }}"
+                 alt="">
+            <span>Luzira PMS</span>
         </a>
 
         {# --- Mobile toggle --- #}
@@ -64,7 +67,9 @@
                 {# Dashboard — everyone #}
                 <li class="nav-item">
                     <a class="nav-link" href="{{ url_for('auth.dashboard') }}">
-                        <i class="bi bi-speedometer2"></i> Dashboard
+                        <img class="navbar-dashboard-icon"
+                             src="{{ url_for('static', filename='images/dashboard-icon.png') }}"
+                             alt=""> Dashboard
                     </a>
                 </li>
 
@@ -72,7 +77,9 @@
                 {% if current_user.role_name == 'System Administrator' %}
                 <li class="nav-item">
                     <a class="nav-link" href="{{ url_for('admin.users_list') }}">
-                        <i class="bi bi-people-fill"></i> Staff Users
+                        <img class="staff-icon staff-icon--nav"
+                             src="{{ url_for('static', filename='images/staff-icon.png') }}"
+                             alt=""> Staff Users
                     </a>
                 </li>
                 <li class="nav-item">
@@ -102,7 +109,7 @@
 
                 {# ----- Inmate records ----- #}
                 {% if current_user.role_name in
-                      ['System Administrator', 'Warden', 'Records Officer', 'Receptionist', 'Medical Officer'] %}
+                      ['System Administrator', 'Warden', 'Records Officer', 'Receptionist', 'Medical Officer', 'Security Officer'] %}
                 <li class="nav-item">
                     <a class="nav-link" href="{{ url_for('inmate.list_inmates') }}">
                         <i class="bi bi-person-vcard"></i> Inmates

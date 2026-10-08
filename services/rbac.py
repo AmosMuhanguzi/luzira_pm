@@ -20,6 +20,7 @@ class Permissions:
     MEDICAL_RECORD_VIEW      = 'medical_record:view'
     MEDICAL_RECORD_CREATE    = 'medical_record:create'
     MEDICAL_RECORD_APPROVE   = 'medical_record:approve'
+    DISCIPLINARY_CREATE      = 'disciplinary:create'
 
         # Inmate — request edit via approval workflow
     INMATE_EDIT_REQUEST = 'inmate:edit_request'
@@ -82,6 +83,7 @@ ROLE_PERMISSIONS = {
         Permissions.INMATE_EDIT_REQUEST, Permissions.INMATE_EDIT_APPROVE,
         Permissions.MEDICAL_RECORD_VIEW, Permissions.MEDICAL_RECORD_CREATE,
         Permissions.MEDICAL_RECORD_APPROVE,
+        Permissions.DISCIPLINARY_CREATE,
     ],
     'Warden': [
         Permissions.INMATE_VIEW,
@@ -91,6 +93,7 @@ ROLE_PERMISSIONS = {
         Permissions.AI_VIEW_ALERTS, Permissions.AI_REVIEW_ALERTS, Permissions.AI_VIEW_DASHBOARD,
         Permissions.REPORT_VIEW, Permissions.REPORT_GENERATE, Permissions.REPORT_EXPORT,
         Permissions.INMATE_EDIT_REQUEST,
+        Permissions.DISCIPLINARY_CREATE,
     ],
     'Records Officer': [
         Permissions.INMATE_VIEW, Permissions.INMATE_CREATE, Permissions.INMATE_EDIT,
@@ -99,6 +102,7 @@ ROLE_PERMISSIONS = {
         Permissions.VISIT_VIEW,
         Permissions.REPORT_VIEW, Permissions.REPORT_GENERATE,
         Permissions.INMATE_EDIT_REQUEST,
+        Permissions.DISCIPLINARY_CREATE,
     ],
     'Receptionist': [
         Permissions.INMATE_VIEW, Permissions.INMATE_CREATE,
@@ -110,11 +114,13 @@ ROLE_PERMISSIONS = {
         Permissions.INMATE_EDIT_REQUEST,
     ],
     'Security Officer': [
+        Permissions.INMATE_VIEW,
         Permissions.VISITOR_VIEW,
         Permissions.VISITOR_BIOMETRIC_VERIFY,
         Permissions.VISIT_VIEW, Permissions.VISIT_APPROVE, Permissions.VISIT_DENY,
         Permissions.AI_VIEW_ALERTS,
         Permissions.INMATE_EDIT_REQUEST,
+        Permissions.DISCIPLINARY_CREATE,
     ],
     'Medical Officer': [
         Permissions.INMATE_VIEW,

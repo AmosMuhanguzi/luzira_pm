@@ -11,8 +11,11 @@ from flask import (Blueprint, render_template, redirect, url_for,
 from flask_login import login_required, current_user
 from flask_wtf import FlaskForm
 from wtforms import DecimalField, HiddenField, SelectField, SubmitField, TextAreaField
-from wtforms.validators import DataRequired, Length, NumberRange, Optional
+from wtforms.validators import (
+    DataRequired, InputRequired, Length, NumberRange, Optional,
+)
 from sqlalchemy import or_
+from sqlalchemy.exc import IntegrityError
 
 from extensions import csrf, db
 from models.cell import CellBlock
@@ -22,7 +25,10 @@ from services.inmate_matcher import InmateMatcher
 from services.biometric_agent_client import BiometricAgentClient, BiometricAgentError
 from models.inmate import AdmissionEpisode, Inmate
 from models.audit import AuditEvent
-from models.medical import DisciplinaryLog, MedicalRecord
+from models.medical import (
+    DisciplinaryLog, EscapeAttemptLog, MedicalRecord, WorkTransferLog,
+)
+from models.visit import VisitLog
 from models.user import UserAccount
 from services.biometric_matcher import compare_templates
 from services.person_photo_service import PersonPhotoService
@@ -38,6 +44,11 @@ RELEASE_TYPES = (
     'Parole',
     'Transfer',
     'Other',
+)
+TRANSFER_PRISONS = (
+    'Kigo Prison',
+    'Nalufenya Prison',
+    'Mubuku Juvenile Prison',
 )
 
 
@@ -55,7 +66,7 @@ class InmateReleaseForm(FlaskForm):
         'Cash or savings returned (UGX)',
         places=2,
         default=Decimal('0.00'),
-        validators=[DataRequired(), NumberRange(min=Decimal('0.00'))],
+        validators=[InputRequired(), NumberRange(min=Decimal('0.00'))],
     )
     release_property_claims = TextAreaField(
         'Property returned or claims',
@@ -88,7 +99,11 @@ def release_form():
         inmate = Inmate.query.filter_by(inmate_id=selected_inmate_id, status='Active').with_for_update().first()
         if not inmate:
             flash('Select an active inmate before recording a release.', 'danger')
-            return render_template('inmate/release.html', form=form)
+            return render_template(
+                'inmate/release.html',
+                form=form,
+                transfer_prisons=TRANSFER_PRISONS,
+            )
 
         scan_proof = session.get('release_fingerprint_verified')
         if not _valid_release_scan_proof(scan_proof, inmate.inmate_id):
@@ -97,6 +112,63 @@ def release_form():
                 'inmate/release.html',
                 form=form,
                 selected_inmate_id=inmate.inmate_id,
+                transfer_prisons=TRANSFER_PRISONS,
+            )
+
+        discharged_at = datetime.now(ZoneInfo('Africa/Kampala')).replace(tzinfo=None)
+        release_date = discharged_at.date()
+        release_type = form.release_type.data
+        transfer_destination = ''
+        if release_type == 'Transfer':
+            selected_destination = (request.form.get('transfer_prison') or '').strip()
+            manual_destination = (
+                request.form.get('transfer_prison_other') or ''
+            ).strip()
+            if selected_destination == 'Other':
+                transfer_destination = manual_destination
+            elif selected_destination in TRANSFER_PRISONS:
+                transfer_destination = selected_destination
+            if (
+                not transfer_destination
+                or len(transfer_destination) > 100
+                or (selected_destination != 'Other' and manual_destination)
+            ):
+                flash(
+                    'Select a receiving prison or enter its name for this transfer.',
+                    'danger',
+                )
+                return render_template(
+                    'inmate/release.html',
+                    form=form,
+                    selected_inmate_id=inmate.inmate_id,
+                    transfer_prisons=TRANSFER_PRISONS,
+                )
+        elif (
+            request.form.get('transfer_prison')
+            or request.form.get('transfer_prison_other')
+        ):
+            flash('Receiving prison is only required for a transfer.', 'danger')
+            return render_template(
+                'inmate/release.html',
+                form=form,
+                selected_inmate_id=inmate.inmate_id,
+                transfer_prisons=TRANSFER_PRISONS,
+            )
+
+        open_work_transfer = WorkTransferLog.query.filter_by(
+            inmate_id=inmate.inmate_id,
+            checked_in_at=None,
+        ).first()
+        if open_work_transfer:
+            flash(
+                'This inmate is currently out for work. Record their fingerprint check-in before discharge.',
+                'danger',
+            )
+            return render_template(
+                'inmate/release.html',
+                form=form,
+                selected_inmate_id=inmate.inmate_id,
+                transfer_prisons=TRANSFER_PRISONS,
             )
 
         episode = inmate.admission_episodes.filter_by(is_current=True).first()
@@ -111,13 +183,11 @@ def release_form():
             )
             db.session.add(episode)
 
-        discharged_at = datetime.now(ZoneInfo('Africa/Kampala')).replace(tzinfo=None)
-        release_date = discharged_at.date()
-        release_type = form.release_type.data
         old_cell = inmate.cell_block
 
         episode.release_date = release_date
         episode.release_type = release_type
+        episode.transfer_to = transfer_destination or None
         episode.release_notes = (form.release_notes.data or '').strip() or None
         episode.release_cash_amount = form.release_cash_amount.data
         episode.release_property_claims = (
@@ -152,6 +222,7 @@ def release_form():
                 'status': inmate.status,
                 'release_date': release_date.isoformat(),
                 'release_type': release_type,
+                'transfer_to': episode.transfer_to,
                 'release_cash_amount': str(episode.release_cash_amount),
                 'release_property_claims': episode.release_property_claims,
                 'released_at': discharged_at.isoformat(),
@@ -170,6 +241,7 @@ def release_form():
     return render_template(
         'inmate/release.html',
         form=form,
+        transfer_prisons=TRANSFER_PRISONS,
     )
 
 
@@ -196,6 +268,9 @@ def api_release_search():
     pattern = f'%{query}%'
     matches = Inmate.query.filter(
         Inmate.status == 'Active',
+        ~Inmate.work_transfer_logs.any(
+            WorkTransferLog.checked_in_at.is_(None)
+        ),
         or_(
             Inmate.full_name.ilike(pattern),
             Inmate.inmate_number.ilike(pattern),
@@ -230,6 +305,19 @@ def api_release_history(inmate_id):
     disciplinary_logs = DisciplinaryLog.query.filter_by(
         inmate_id=inmate.inmate_id
     ).order_by(DisciplinaryLog.incident_date.desc()).all()
+    escape_attempt_logs = EscapeAttemptLog.query.filter_by(
+        inmate_id=inmate.inmate_id
+    ).order_by(
+        EscapeAttemptLog.incident_date.desc(),
+        EscapeAttemptLog.incident_time.desc(),
+        EscapeAttemptLog.event_id.desc(),
+    ).all()
+    work_transfer_logs = WorkTransferLog.query.filter_by(
+        inmate_id=inmate.inmate_id
+    ).order_by(
+        WorkTransferLog.checked_out_at.desc(),
+        WorkTransferLog.transfer_id.desc(),
+    ).all()
     audit_history = AuditEvent.query.filter_by(
         entity_type='Inmate',
         entity_id=inmate.inmate_id,
@@ -273,6 +361,10 @@ def api_release_history(inmate_id):
             'risk_level': inmate.risk_level,
             'violence_history': inmate.violence_history,
             'escape_attempt_history': inmate.escape_attempt_history,
+            'work_status': (
+                'Out for work' if any(log.is_out for log in work_transfer_logs)
+                else 'Inside'
+            ),
             'status': inmate.status,
             'total_admissions': inmate.total_admissions,
             'biometric_enrolled': bool(inmate.biometric_enrolled and inmate.fingerprint_template),
@@ -289,6 +381,7 @@ def api_release_history(inmate_id):
                 if episode.release_cash_amount is not None else None
             ),
             'release_property_claims': episode.release_property_claims,
+            'transfer_to': episode.transfer_to,
             'released_at': episode.released_at.isoformat() if episode.released_at else None,
             'current': bool(episode.is_current),
         } for episode in episodes],
@@ -301,11 +394,40 @@ def api_release_history(inmate_id):
         } for record in medical_records],
         'disciplinary_history': [{
             'date': log.incident_date.isoformat() if log.incident_date else None,
+            'time': log.incident_time.strftime('%H:%M') if log.incident_time else None,
             'type': log.incident_type,
             'description': log.description,
             'action': log.action_taken,
             'punishment': log.punishment_assigned,
+            'injured_count': (
+                log.injured_count if log.injured_count is not None
+                else 'Not recorded'
+            ),
+            'is_violent': (
+                'Yes' if log.is_violent is True
+                else 'No' if log.is_violent is False
+                else 'Not classified'
+            ),
+            'witnesses': log.witnesses,
         } for log in disciplinary_logs],
+        'escape_history': [{
+            'date': event.incident_date.isoformat() if event.incident_date else None,
+            'time': event.incident_time.strftime('%H:%M') if event.incident_time else None,
+            'description': event.description,
+            'outcome': event.outcome,
+            'action_taken': event.action_taken,
+        } for event in escape_attempt_logs],
+        'work_transfer_history': [{
+            'location': log.work_location,
+            'description': log.work_description,
+            'checked_out_at': log.checked_out_at.isoformat(sep=' ', timespec='minutes'),
+            'checked_in_at': (
+                log.checked_in_at.isoformat(sep=' ', timespec='minutes')
+                if log.checked_in_at else None
+            ),
+            'status': 'Out for work' if log.is_out else 'Inside',
+            'time_out_minutes': log.time_out,
+        } for log in work_transfer_logs],
         'audit_history': [{
             'date': event.event_timestamp.isoformat() if event.event_timestamp else None,
             'type': event.event_type,
@@ -389,6 +511,163 @@ def api_release_fingerprint():
     })
 
 
+@inmate_bp.route(
+    '/api/<int:inmate_id>/work-transfer/<action>', methods=['POST']
+)
+@login_required
+@require_permission(Permissions.INMATE_RELEASE)
+def work_transfer_action(inmate_id, action):
+    if action not in {'checkout', 'checkin'}:
+        abort(404)
+    if _mock_mode():
+        return jsonify({
+            'ok': False,
+            'error': 'Work-transfer fingerprint confirmation requires real hardware. Disable biometric mock mode first.',
+        }), 503
+
+    inmate = Inmate.query.filter_by(
+        inmate_id=inmate_id, status='Active'
+    ).with_for_update().first_or_404()
+    if not inmate.biometric_enrolled or not inmate.fingerprint_template:
+        return jsonify({
+            'ok': False,
+            'error': 'This inmate has no enrolled fingerprint. Work transfer cannot be confirmed.',
+        }), 400
+
+    open_transfer = WorkTransferLog.query.filter_by(
+        inmate_id=inmate.inmate_id,
+        checked_in_at=None,
+    ).first()
+    payload = request.get_json(silent=True) or {}
+
+    if action == 'checkout':
+        if open_transfer:
+            return jsonify({
+                'ok': False,
+                'error': 'This inmate is already marked Out for work. Check them in before starting another trip.',
+            }), 409
+        work_location = (payload.get('work_location') or '').strip()
+        work_description = (payload.get('work_description') or '').strip()
+        if not work_location or len(work_location) > 200:
+            return jsonify({
+                'ok': False,
+                'error': 'Enter a work destination of no more than 200 characters.',
+            }), 400
+        if len(work_description) > 2000:
+            return jsonify({
+                'ok': False,
+                'error': 'Work details must be no more than 2,000 characters.',
+            }), 400
+    elif not open_transfer:
+        return jsonify({
+            'ok': False,
+            'error': 'There is no open work trip to check in.',
+        }), 409
+
+    try:
+        probe = _agent().scan()
+    except BiometricAgentError as error:
+        return jsonify({'ok': False, 'error': str(error)}), 503
+
+    if not probe.get('success') or not probe.get('template'):
+        return jsonify({
+            'ok': False,
+            'error': probe.get('error', 'Fingerprint scan did not return a template.'),
+        }), 400
+    try:
+        quality = float(probe['quality'])
+    except (KeyError, TypeError, ValueError):
+        return jsonify({
+            'ok': False,
+            'error': 'The scanner did not report valid fingerprint quality; try again.',
+        }), 400
+    quality_threshold = current_app.config.get('BIOMETRIC_QUALITY_MIN', 60)
+    if not 0 <= quality <= 100 or quality < quality_threshold:
+        return jsonify({
+            'ok': False,
+            'error': f'Fingerprint quality is too low ({quality:g}%). Try again.',
+        }), 400
+
+    score = compare_templates(probe['template'], inmate.fingerprint_template)
+    threshold = current_app.config.get('BIOMETRIC_MATCH_THRESHOLD', 75)
+    if score < threshold:
+        return jsonify({
+            'ok': False,
+            'score': round(score, 2),
+            'error': 'Scanned fingerprint does not match the selected inmate.',
+        }), 403
+
+    action_at = datetime.now(ZoneInfo('Africa/Kampala')).replace(tzinfo=None)
+    if action == 'checkout':
+        transfer = WorkTransferLog(
+            inmate_id=inmate.inmate_id,
+            work_location=work_location,
+            work_description=work_description or None,
+            checked_out_at=action_at,
+            checkout_fingerprint_score=Decimal(str(score)),
+            checked_out_by=current_user.user_id,
+        )
+        db.session.add(transfer)
+        event_description = (
+            f'Checked inmate {inmate.inmate_number} out for work at {work_location}'
+        )
+        response_message = 'Fingerprint matched. Inmate is now Out for work.'
+        new_values = {
+            'status': 'Out for work',
+            'work_location': work_location,
+            'work_description': work_description or None,
+            'checked_out_at': action_at.isoformat(),
+            'checkout_fingerprint_score': round(score, 2),
+        }
+    else:
+        open_transfer.checked_in_at = action_at
+        open_transfer.checkin_fingerprint_score = Decimal(str(score))
+        open_transfer.checked_in_by = current_user.user_id
+        event_description = (
+            f'Checked inmate {inmate.inmate_number} back in from work'
+        )
+        response_message = 'Fingerprint matched. Inmate is now Inside.'
+        new_values = {
+            'status': 'Inside',
+            'work_location': open_transfer.work_location,
+            'checked_in_at': action_at.isoformat(),
+            'time_out_minutes': max(
+                0, int((action_at - open_transfer.checked_out_at).total_seconds() // 60)
+            ),
+            'checkin_fingerprint_score': round(score, 2),
+        }
+
+    AuditEvent.log_event(
+        event_category='Inmate',
+        event_type=f'Work {action.title()}',
+        event_description=event_description,
+        entity_type='Inmate',
+        entity_id=inmate.inmate_id,
+        user_id=current_user.user_id,
+        username=current_user.username,
+        user_role=current_user.role_name,
+        ip_address=request.remote_addr,
+        user_agent=request.headers.get('User-Agent'),
+        new_values=new_values,
+    )
+    try:
+        db.session.commit()
+    except IntegrityError:
+        db.session.rollback()
+        return jsonify({
+            'ok': False,
+            'error': 'Another work-transfer action was just recorded. Refresh the inmate record and try again.',
+        }), 409
+
+    flash(response_message, 'success')
+    return jsonify({
+        'ok': True,
+        'score': round(score, 2),
+        'message': response_message,
+        'status': 'Out for work' if action == 'checkout' else 'Inside',
+    })
+
+
 @inmate_bp.route('/release/<int:episode_id>/print')
 @login_required
 @require_permission(Permissions.INMATE_RELEASE)
@@ -397,11 +676,73 @@ def release_print(episode_id):
         AdmissionEpisode.episode_id == episode_id,
         AdmissionEpisode.release_date.isnot(None),
     ).first_or_404()
+    inmate = episode.inmate
     officer = db.session.get(UserAccount, episode.releasing_officer_id)
+    admission_episodes = inmate.admission_episodes.order_by(
+        AdmissionEpisode.admission_date.asc(),
+        AdmissionEpisode.episode_id.asc(),
+    ).all()
+    disciplinary_logs = DisciplinaryLog.query.filter_by(
+        inmate_id=inmate.inmate_id
+    ).order_by(
+        DisciplinaryLog.incident_date.desc(),
+        DisciplinaryLog.incident_time.desc(),
+        DisciplinaryLog.log_id.desc(),
+    ).all()
+    escape_attempt_logs = EscapeAttemptLog.query.filter_by(
+        inmate_id=inmate.inmate_id
+    ).order_by(
+        EscapeAttemptLog.incident_date.desc(),
+        EscapeAttemptLog.incident_time.desc(),
+        EscapeAttemptLog.event_id.desc(),
+    ).all()
+    work_transfer_logs = WorkTransferLog.query.filter_by(
+        inmate_id=inmate.inmate_id
+    ).order_by(
+        WorkTransferLog.checked_out_at.asc(),
+        WorkTransferLog.transfer_id.asc(),
+    ).all()
+
+    medical_records = []
+    if has_permission(Permissions.MEDICAL_RECORD_VIEW):
+        medical_records = MedicalRecord.query.filter(
+            MedicalRecord.inmate_id == inmate.inmate_id,
+            or_(
+                MedicalRecord.approval_status == 'Approved',
+                MedicalRecord.recorded_by == current_user.user_id,
+                MedicalRecord.approval_status == 'Pending',
+            ),
+        ).order_by(
+            MedicalRecord.record_date.asc(),
+            MedicalRecord.record_id.asc(),
+        ).all()
+        if not has_permission(Permissions.MEDICAL_RECORD_APPROVE):
+            medical_records = [
+                record for record in medical_records
+                if record.approval_status == 'Approved'
+                or record.recorded_by == current_user.user_id
+            ]
+
+    visit_logs = []
+    if has_permission(Permissions.VISIT_VIEW):
+        visit_logs = inmate.visit_logs.order_by(
+            VisitLog.check_in_time.asc(),
+            VisitLog.visit_id.asc(),
+        ).all()
+
     return render_template(
         'inmate/release_print.html',
         episode=episode,
+        inmate=inmate,
         officer=officer,
+        admission_episodes=admission_episodes,
+        disciplinary_logs=disciplinary_logs,
+        escape_attempt_logs=escape_attempt_logs,
+        work_transfer_logs=work_transfer_logs,
+        medical_records=medical_records,
+        show_medical=has_permission(Permissions.MEDICAL_RECORD_VIEW),
+        visit_logs=visit_logs,
+        show_visits=has_permission(Permissions.VISIT_VIEW),
     )
 
 
@@ -752,6 +1093,24 @@ def detail(inmate_id):
     episodes = inmate.admission_episodes.order_by(
         AdmissionEpisode.admission_date.desc()
     ).all()
+    disciplinary_logs = inmate.disciplinary_logs.order_by(
+        DisciplinaryLog.incident_date.desc(),
+        DisciplinaryLog.incident_time.desc(),
+        DisciplinaryLog.log_id.desc(),
+    ).all()
+    escape_attempt_logs = inmate.escape_attempt_logs.order_by(
+        EscapeAttemptLog.incident_date.desc(),
+        EscapeAttemptLog.incident_time.desc(),
+        EscapeAttemptLog.event_id.desc(),
+    ).all()
+    work_transfer_logs = inmate.work_transfer_logs.order_by(
+        WorkTransferLog.checked_out_at.desc(),
+        WorkTransferLog.transfer_id.desc(),
+    ).all()
+    current_work_transfer = next(
+        (transfer for transfer in work_transfer_logs if transfer.is_out),
+        None,
+    )
 
     pending_edits = EditRequestService.pending_for_inmate(inmate_id)
     medical_records = MedicalRecord.query.filter(
@@ -771,8 +1130,176 @@ def detail(inmate_id):
 
     return render_template('inmate/detail.html',
                            inmate=inmate, episodes=episodes,
+                           disciplinary_logs=disciplinary_logs,
+                           escape_attempt_logs=escape_attempt_logs,
+                           work_transfer_logs=work_transfer_logs,
+                           current_work_transfer=current_work_transfer,
+                           today=date.today().isoformat(),
                            pending_edits=pending_edits,
                            medical_records=medical_records)
+
+
+@inmate_bp.route('/<int:inmate_id>/disciplinary', methods=['POST'])
+@login_required
+@require_permission(Permissions.DISCIPLINARY_CREATE)
+def add_disciplinary_log(inmate_id):
+    inmate = InmateService.get(inmate_id)
+    if not inmate:
+        abort(404)
+
+    incident_type = (request.form.get('incident_type') or '').strip()
+    description = (request.form.get('description') or '').strip()
+    date_value = (request.form.get('incident_date') or '').strip()
+    time_value = (request.form.get('incident_time') or '').strip()
+    witnesses = (request.form.get('witnesses') or '').strip()
+    action_taken = (request.form.get('action_taken') or '').strip()
+    injuries_value = (request.form.get('injured_count') or '').strip()
+    is_violent = request.form.get('is_violent') == 'on'
+
+    try:
+        incident_date = datetime.strptime(date_value, '%Y-%m-%d').date()
+    except ValueError:
+        flash('Enter a valid incident date.', 'danger')
+        return redirect(url_for('inmate.detail', inmate_id=inmate_id))
+    try:
+        incident_time = datetime.strptime(time_value, '%H:%M').time()
+    except ValueError:
+        flash('Enter a valid incident time.', 'danger')
+        return redirect(url_for('inmate.detail', inmate_id=inmate_id))
+    try:
+        injured_count = int(injuries_value) if injuries_value else None
+        if injured_count is not None and not 0 <= injured_count <= 2_147_483_647:
+            raise ValueError
+    except ValueError:
+        flash(
+            'Number injured must be a whole number between 0 and 2,147,483,647.',
+            'danger',
+        )
+        return redirect(url_for('inmate.detail', inmate_id=inmate_id))
+
+    if not incident_type or len(incident_type) > 100:
+        flash('Enter an incident type of no more than 100 characters.', 'danger')
+        return redirect(url_for('inmate.detail', inmate_id=inmate_id))
+    if not description:
+        flash('Describe what happened or what was attempted.', 'danger')
+        return redirect(url_for('inmate.detail', inmate_id=inmate_id))
+    if len(description) > 4000 or len(witnesses) > 2000 or len(action_taken) > 2000:
+        flash(
+            'Incident description, witnesses, and action fields must be within their length limits.',
+            'danger',
+        )
+        return redirect(url_for('inmate.detail', inmate_id=inmate_id))
+
+    log = DisciplinaryLog(
+        inmate_id=inmate.inmate_id,
+        incident_date=incident_date,
+        incident_time=incident_time,
+        incident_type=incident_type,
+        description=description,
+        is_violent=is_violent,
+        injured_count=injured_count,
+        witnesses=witnesses or None,
+        action_taken=action_taken or None,
+        reported_by=current_user.user_id,
+    )
+    db.session.add(log)
+    if is_violent:
+        inmate.violence_history = True
+    AuditEvent.log_event(
+        event_category='Inmate',
+        event_type='Disciplinary Incident',
+        event_description=(
+            f'Recorded {incident_type} incident for inmate '
+            f'{inmate.inmate_number}'
+        ),
+        entity_type='Inmate',
+        entity_id=inmate.inmate_id,
+        user_id=current_user.user_id,
+        username=current_user.username,
+        user_role=current_user.role_name,
+        ip_address=request.remote_addr,
+        user_agent=request.headers.get('User-Agent'),
+        new_values={
+            'incident_date': incident_date.isoformat(),
+            'incident_time': incident_time.strftime('%H:%M'),
+            'incident_type': incident_type,
+            'description': description,
+            'is_violent': is_violent,
+            'injured_count': injured_count,
+            'action_taken': action_taken or None,
+            'witnesses': witnesses or None,
+        },
+    )
+    db.session.commit()
+    flash('Disciplinary incident added to the inmate record.', 'success')
+    return redirect(url_for('inmate.detail', inmate_id=inmate_id))
+
+
+@inmate_bp.route('/<int:inmate_id>/escape-history', methods=['POST'])
+@login_required
+@require_permission(Permissions.DISCIPLINARY_CREATE)
+def add_escape_attempt(inmate_id):
+    inmate = InmateService.get(inmate_id)
+    if not inmate:
+        abort(404)
+
+    date_value = (request.form.get('incident_date') or '').strip()
+    time_value = (request.form.get('incident_time') or '').strip()
+    description = (request.form.get('description') or '').strip()
+    outcome = (request.form.get('outcome') or '').strip()
+    action_taken = (request.form.get('action_taken') or '').strip()
+
+    try:
+        incident_date = datetime.strptime(date_value, '%Y-%m-%d').date()
+    except ValueError:
+        flash('Enter a valid escape incident date.', 'danger')
+        return redirect(url_for('inmate.detail', inmate_id=inmate_id))
+    try:
+        incident_time = datetime.strptime(time_value, '%H:%M').time()
+    except ValueError:
+        flash('Enter a valid escape incident time.', 'danger')
+        return redirect(url_for('inmate.detail', inmate_id=inmate_id))
+    if not description or len(description) > 4000:
+        flash('Describe the escape attempt in 1 to 4,000 characters.', 'danger')
+        return redirect(url_for('inmate.detail', inmate_id=inmate_id))
+    if len(outcome) > 2000 or len(action_taken) > 2000:
+        flash('Outcome and action fields must be no more than 2,000 characters.', 'danger')
+        return redirect(url_for('inmate.detail', inmate_id=inmate_id))
+
+    event = EscapeAttemptLog(
+        inmate_id=inmate.inmate_id,
+        incident_date=incident_date,
+        incident_time=incident_time,
+        description=description,
+        outcome=outcome or None,
+        action_taken=action_taken or None,
+        reported_by=current_user.user_id,
+    )
+    db.session.add(event)
+    inmate.escape_attempt_history = True
+    AuditEvent.log_event(
+        event_category='Inmate',
+        event_type='Escape Attempt',
+        event_description=f'Recorded escape history for inmate {inmate.inmate_number}',
+        entity_type='Inmate',
+        entity_id=inmate.inmate_id,
+        user_id=current_user.user_id,
+        username=current_user.username,
+        user_role=current_user.role_name,
+        ip_address=request.remote_addr,
+        user_agent=request.headers.get('User-Agent'),
+        new_values={
+            'incident_date': incident_date.isoformat(),
+            'incident_time': incident_time.strftime('%H:%M'),
+            'description': description,
+            'outcome': outcome or None,
+            'action_taken': action_taken or None,
+        },
+    )
+    db.session.commit()
+    flash('Escape history added to the inmate record.', 'success')
+    return redirect(url_for('inmate.detail', inmate_id=inmate_id))
+
 
 @inmate_bp.route('/register', methods=['GET', 'POST'])
 def register_inmate():

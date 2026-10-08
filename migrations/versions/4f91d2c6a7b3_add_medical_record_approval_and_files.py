@@ -4,6 +4,8 @@ Revision ID: 4f91d2c6a7b3
 Revises: 91b7f63d2a40
 Create Date: 2026-10-08 11:45:00
 """
+from datetime import datetime
+
 from alembic import op
 import sqlalchemy as sa
 
@@ -46,15 +48,20 @@ def upgrade():
         'roles',
         sa.column('role_name', sa.String(length=50)),
         sa.column('description', sa.Text()),
+        sa.column('created_at', sa.DateTime()),
+        sa.column('updated_at', sa.DateTime()),
     )
     role_exists = bind.execute(
         sa.select(roles.c.role_name).where(roles.c.role_name == 'Medical Officer')
     ).first()
     if not role_exists:
+        now = datetime.utcnow()
         bind.execute(
             roles.insert().values(
                 role_name='Medical Officer',
                 description='View inmate records and submit medical records for approval',
+                created_at=now,
+                updated_at=now,
             )
         )
 

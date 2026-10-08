@@ -15,6 +15,14 @@
     letter-spacing: -0.035em;
 }
 
+.dashboard-title-icon {
+    width: 2.4rem;
+    height: 2.4rem;
+    margin-right: 0.25rem;
+    object-fit: contain;
+    vertical-align: -0.45rem;
+}
+
 .dashboard-heading .badge {
     background: #2563eb !important;
     border-radius: 999px;

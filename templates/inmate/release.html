@@ -66,6 +66,26 @@
                 <div class="accordion-item">
                     <h2 class="accordion-header">
                         <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"
+                                data-bs-target="#escapeHistory">Escape history</button>
+                    </h2>
+                    <div id="escapeHistory" class="accordion-collapse collapse"
+                         data-bs-parent="#historyAccordion">
+                        <div class="accordion-body" id="escapeHistoryBody"></div>
+                    </div>
+                </div>
+                <div class="accordion-item">
+                    <h2 class="accordion-header">
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"
+                                data-bs-target="#workTransferHistory">Temporary work transfers</button>
+                    </h2>
+                    <div id="workTransferHistory" class="accordion-collapse collapse"
+                         data-bs-parent="#historyAccordion">
+                        <div class="accordion-body" id="workTransferHistoryBody"></div>
+                    </div>
+                </div>
+                <div class="accordion-item">
+                    <h2 class="accordion-header">
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"
                                 data-bs-target="#auditHistory">Other recorded activity</button>
                     </h2>
                     <div id="auditHistory" class="accordion-collapse collapse"
@@ -110,6 +130,28 @@
                         {% for error in form.release_type.errors %}
                         <div class="invalid-feedback">{{ error }}</div>
                         {% endfor %}
+                    </div>
+                    <div class="col-md-6" id="transferPrisonField" hidden>
+                        <label class="form-label fw-semibold" for="transfer_prison">
+                            Receiving prison <span class="text-danger">*</span>
+                        </label>
+                        <select class="form-select" id="transfer_prison" name="transfer_prison">
+                            <option value="">Select a prison…</option>
+                            {% for prison in transfer_prisons %}
+                            <option value="{{ prison }}" {{ 'selected' if request.form.get('transfer_prison') == prison }}>
+                                {{ prison }}
+                            </option>
+                            {% endfor %}
+                            <option value="Other" {{ 'selected' if request.form.get('transfer_prison') == 'Other' }}>
+                                Other (enter manually)
+                            </option>
+                        </select>
+                        <input class="form-control mt-2" id="transfer_prison_other"
+                               name="transfer_prison_other" maxlength="100"
+                               value="{{ request.form.get('transfer_prison_other', '') }}"
+                               placeholder="Enter receiving prison name"
+                               {% if request.form.get('transfer_prison') != 'Other' %}hidden{% endif %}>
+                        <div class="form-text">Required for permanent prison transfers.</div>
                     </div>
                     <div class="col-md-6">
                         {{ form.release_cash_amount.label(class="form-label fw-semibold") }}
@@ -159,11 +201,28 @@ const searchStatus = document.getElementById('searchStatus');
 const hiddenInmateId = document.getElementById('inmate_id');
 const scanButton = document.getElementById('scanFingerprintBtn');
 const releaseSubmit = document.getElementById('releaseSubmit');
+const releaseType = document.getElementById('release_type');
+const transferPrisonField = document.getElementById('transferPrisonField');
+const transferPrison = document.getElementById('transfer_prison');
+const transferPrisonOther = document.getElementById('transfer_prison_other');
 let searchTimer;
 let selectedInmate = null;
 let fingerprintVerified = false;
 
 releaseSubmit.disabled = true;
+
+function updateTransferFields() {
+    const isTransfer = releaseType.value === 'Transfer';
+    transferPrisonField.hidden = !isTransfer;
+    transferPrison.required = isTransfer;
+    const isOther = isTransfer && transferPrison.value === 'Other';
+    transferPrisonOther.hidden = !isOther;
+    transferPrisonOther.required = isOther;
+}
+
+releaseType.addEventListener('change', updateTransferFields);
+transferPrison.addEventListener('change', updateTransferFields);
+updateTransferFields();
 
 searchInput.addEventListener('input', () => {
     window.clearTimeout(searchTimer);
@@ -215,6 +274,7 @@ async function selectInmate(inmate) {
         renderRows('admissionHistoryBody', history.admissions, [
             ['Date', 'date'], ['Admission type', 'type'], ['Reason', 'reason'],
             ['Release date', 'release_date'], ['Release type', 'release_type'],
+            ['Transferred to', 'transfer_to'],
             ['Notes', 'release_notes'], ['Cash returned (UGX)', 'release_cash_amount'],
             ['Property returned / claims', 'release_property_claims'],
             ['Discharged at', 'released_at'], ['Current episode', 'current']
@@ -224,8 +284,21 @@ async function selectInmate(inmate) {
             ['Treatment', 'treatment'], ['Notes', 'notes']
         ]);
         renderRows('disciplinaryHistoryBody', history.disciplinary_history, [
-            ['Date', 'date'], ['Incident', 'type'], ['Description', 'description'],
-            ['Action', 'action'], ['Punishment', 'punishment']
+            ['Date', 'date'], ['Time', 'time'], ['Incident', 'type'],
+            ['Violent incident', 'is_violent'],
+            ['What happened / was attempted', 'description'],
+            ['People injured', 'injured_count'], ['Action taken', 'action'],
+            ['Punishment', 'punishment'], ['Witnesses', 'witnesses']
+        ]);
+        renderRows('escapeHistoryBody', history.escape_history, [
+            ['Date', 'date'], ['Time', 'time'],
+            ['What was attempted', 'description'], ['Outcome', 'outcome'],
+            ['Response / action taken', 'action_taken']
+        ]);
+        renderRows('workTransferHistoryBody', history.work_transfer_history, [
+            ['Work location', 'location'], ['Assignment', 'description'],
+            ['Checked out at', 'checked_out_at'], ['Checked in at', 'checked_in_at'],
+            ['Status', 'status'], ['Time out (minutes)', 'time_out_minutes']
         ]);
         renderRows('auditHistoryBody', history.audit_history, [
             ['Date', 'date'], ['Activity', 'type'], ['Details', 'description']

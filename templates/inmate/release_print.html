@@ -7,31 +7,275 @@
         <i class="bi bi-arrow-left"></i> New discharge
     </a>
     <button type="button" class="btn btn-primary" onclick="window.print()">
-        <i class="bi bi-printer"></i> Print discharge form
+        <i class="bi bi-printer"></i> Print full inmate record
     </button>
 </div>
 
 <article class="discharge-document mx-auto border bg-white p-4 p-md-5">
     <header class="text-center border-bottom pb-3 mb-4">
         <h2 class="mb-1">LUZIRA PRISON</h2>
-        <h4 class="text-uppercase mb-1">Inmate Discharge Record</h4>
-        <div class="text-muted">Official discharge, property and cash return record</div>
+        <h4 class="text-uppercase mb-1">Inmate Record and Discharge</h4>
+        <div class="text-muted">Complete inmate profile and confirmed discharge details</div>
     </header>
 
-    <div class="row g-3 mb-4">
-        <div class="col-6"><strong>Inmate:</strong> {{ episode.inmate.full_name }}</div>
-        <div class="col-6"><strong>Inmate number:</strong> {{ episode.inmate.inmate_number }}</div>
-        <div class="col-6"><strong>Date of birth:</strong> {{ episode.inmate.date_of_birth or '—' }}</div>
-        <div class="col-6"><strong>National ID:</strong> {{ episode.inmate.national_id_number or '—' }}</div>
-        <div class="col-6"><strong>Offence:</strong> {{ episode.inmate.crime_category or '—' }}</div>
-        <div class="col-6"><strong>Case number:</strong> {{ episode.inmate.court_case_number or '—' }}</div>
-        <div class="col-6"><strong>Admission date:</strong> {{ episode.admission_date or '—' }}</div>
-        <div class="col-6"><strong>Total admissions:</strong> {{ episode.inmate.total_admissions or 0 }}</div>
+    <div class="row g-3 mb-4 align-items-start">
+        <div class="col-sm-3 text-center">
+            {% if inmate.photo_path %}
+            <img class="inmate-photo" src="{{ url_for('inmate.photo', inmate_id=inmate.inmate_id, filename=inmate.photo_path) }}"
+                 alt="Photo of {{ inmate.full_name }}">
+            {% else %}
+            <div class="inmate-photo photo-placeholder">No photo available</div>
+            {% endif %}
+        </div>
+        <div class="col-sm-9">
+            <h5 class="mb-3">{{ inmate.full_name }} <span class="text-muted">({{ inmate.inmate_number }})</span></h5>
+            <div class="row g-2">
+                <div class="col-md-6"><strong>Record ID:</strong> {{ inmate.inmate_id }}</div>
+                <div class="col-md-6"><strong>Status at discharge:</strong> {{ inmate.status }}</div>
+                <div class="col-md-6"><strong>Date of birth:</strong> {{ inmate.date_of_birth or '—' }}</div>
+                <div class="col-md-6"><strong>Gender:</strong> {{ inmate.gender or '—' }}</div>
+                <div class="col-md-6"><strong>Nationality:</strong> {{ inmate.nationality or '—' }}</div>
+                <div class="col-md-6"><strong>Tribe:</strong> {{ inmate.tribe or '—' }}</div>
+                <div class="col-md-6"><strong>Religion:</strong> {{ inmate.religion or '—' }}</div>
+                <div class="col-md-6"><strong>Aliases:</strong> {{ inmate.alias_names or '—' }}</div>
+                <div class="col-md-6"><strong>National ID:</strong> {{ inmate.national_id_number or '—' }}</div>
+                <div class="col-md-6"><strong>Passport:</strong> {{ inmate.passport_number or '—' }}</div>
+            </div>
+        </div>
     </div>
+
+    <h5 class="border-bottom pb-2">Next of kin</h5>
+    <div class="row g-3 mb-4">
+        <div class="col-md-6"><strong>Name:</strong> {{ inmate.next_of_kin_name or '—' }}</div>
+        <div class="col-md-6"><strong>Relationship:</strong> {{ inmate.next_of_kin_relationship or '—' }}</div>
+        <div class="col-md-6"><strong>Phone:</strong> {{ inmate.next_of_kin_phone or '—' }}</div>
+        <div class="col-12"><strong>Address:</strong><br>{{ inmate.next_of_kin_address or '—' }}</div>
+    </div>
+
+    <h5 class="border-bottom pb-2">Physical description</h5>
+    <div class="row g-3 mb-4">
+        <div class="col-md-4"><strong>Height:</strong> {{ inmate.height_cm ~ ' cm' if inmate.height_cm is not none else '—' }}</div>
+        <div class="col-md-4"><strong>Weight:</strong> {{ inmate.weight_kg ~ ' kg' if inmate.weight_kg is not none else '—' }}</div>
+        <div class="col-md-4"><strong>Eye color:</strong> {{ inmate.eye_color or '—' }}</div>
+        <div class="col-md-4"><strong>Hair color:</strong> {{ inmate.hair_color or '—' }}</div>
+        <div class="col-12"><strong>Distinguishing marks:</strong><br>{{ inmate.distinguishing_marks or '—' }}</div>
+    </div>
+
+    <h5 class="border-bottom pb-2">Legal and sentence information</h5>
+    <div class="row g-3 mb-4">
+        <div class="col-md-6"><strong>Offence:</strong> {{ inmate.crime_category or '—' }}</div>
+        <div class="col-md-6"><strong>Case number:</strong> {{ inmate.court_case_number or '—' }}</div>
+        <div class="col-md-6"><strong>Sentencing court:</strong> {{ inmate.sentencing_court or '—' }}</div>
+        <div class="col-md-6"><strong>Judge:</strong> {{ inmate.judge_name or '—' }}</div>
+        <div class="col-12"><strong>Offence details:</strong><br>{{ inmate.crime_description or '—' }}</div>
+        <div class="col-md-6"><strong>Sentence type:</strong> {{ inmate.sentence_type or '—' }}</div>
+        <div class="col-md-6"><strong>Sentence duration:</strong> {{ inmate.sentence_duration or '—' }}</div>
+        <div class="col-md-6"><strong>Sentence start:</strong> {{ inmate.sentence_start_date or '—' }}</div>
+        <div class="col-md-6"><strong>Expected release:</strong> {{ inmate.expected_release_date or '—' }}</div>
+        <div class="col-md-6"><strong>Actual release:</strong> {{ inmate.actual_release_date or '—' }}</div>
+    </div>
+
+    <h5 class="border-bottom pb-2">Custody, security and risk</h5>
+    <div class="row g-3 mb-4">
+        <div class="col-md-6"><strong>Cell block:</strong> {{ inmate.cell_block or '—' }}</div>
+        <div class="col-md-6"><strong>Cell number:</strong> {{ inmate.cell_number or '—' }}</div>
+        <div class="col-md-6"><strong>Security classification:</strong> {{ inmate.security_classification or '—' }}</div>
+        <div class="col-md-6"><strong>Risk level:</strong> {{ inmate.risk_level or '—' }}</div>
+        <div class="col-md-6"><strong>Total admissions:</strong> {{ inmate.total_admissions or 0 }}</div>
+        <div class="col-md-6"><strong>Current admission date:</strong> {{ inmate.current_admission_date or '—' }}</div>
+        <div class="col-md-6"><strong>Violence history flagged:</strong> {{ 'Yes' if inmate.violence_history else 'No' }}</div>
+        <div class="col-md-6"><strong>Escape history flagged:</strong> {{ 'Yes' if inmate.escape_attempt_history else 'No' }}</div>
+        <div class="col-md-6"><strong>Fingerprint enrolled:</strong> {{ 'Yes' if inmate.biometric_enrolled else 'No' }}</div>
+        {% if inmate.biometric_enrolled %}
+        <div class="col-md-6"><strong>Enrollment date:</strong>
+            {{ inmate.biometric_enrollment_date.strftime('%Y-%m-%d %H:%M') if inmate.biometric_enrollment_date else '—' }}
+        </div>
+        <div class="col-md-6"><strong>Enrollment quality:</strong> {{ inmate.biometric_quality_score if inmate.biometric_quality_score is not none else '—' }}</div>
+        {% endif %}
+    </div>
+
+    {% if show_medical %}
+    <h5 class="border-bottom pb-2">Medical information</h5>
+    <div class="row g-3 mb-3">
+        <div class="col-md-6"><strong>Medical condition flagged:</strong> {{ 'Yes' if inmate.has_medical_condition else 'No' }}</div>
+        <div class="col-12"><strong>Medical alert:</strong><br>{{ inmate.medical_alert or '—' }}</div>
+    </div>
+    {% if medical_records %}
+    <div class="table-responsive mb-4">
+        <table class="table table-sm table-bordered align-middle">
+            <thead><tr><th>Date</th><th>Type / officer</th><th>Complaint / diagnosis</th><th>Treatment / medication</th><th>Notes / files</th></tr></thead>
+            <tbody>
+                {% for record in medical_records %}
+                <tr>
+                    <td>{{ record.record_date or '—' }}</td>
+                    <td>{{ record.record_type or 'Medical record' }}{% if record.attending_medical_officer %}<br>{{ record.attending_medical_officer }}{% endif %}<br>{{ record.approval_status }}</td>
+                    <td>{{ record.complaint or '—' }}{% if record.diagnosis %}<br><strong>Diagnosis:</strong> {{ record.diagnosis }}{% endif %}</td>
+                    <td>{{ record.treatment_prescribed or '—' }}{% if record.medication_details %}<br><strong>Medication:</strong> {{ record.medication_details }}{% endif %}</td>
+                    <td>{{ record.notes or '—' }}
+                        {% if record.referred_to_hospital %}<br>Hospital referral: {{ record.hospital_name or 'Hospital not specified' }}{% endif %}
+                        {% if record.attachment_name %}<br>{{ record.attachment_name }}{% endif %}
+                        {% for attachment in record.attachments %}<br>{{ attachment.original_name }}{% endfor %}
+                        {% if record.review_notes %}<br>Review: {{ record.review_notes }}{% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <p class="mb-4">No medical records available to print.</p>
+    {% endif %}
+    {% endif %}
+
+    <h5 class="border-bottom pb-2">Admission history</h5>
+    {% if admission_episodes %}
+    <div class="table-responsive mb-4">
+        <table class="table table-sm table-bordered align-middle">
+            <thead><tr><th>Admission</th><th>Type / reason</th><th>Receiving facility</th><th>Discharge</th><th>Discharge type / destination</th><th>Discharge notes</th><th>Cash / property</th><th>Fingerprint</th></tr></thead>
+            <tbody>
+                {% for admission in admission_episodes %}
+                <tr>
+                    <td>{{ admission.admission_date or '—' }}</td>
+                    <td>{{ admission.admission_type or '—' }}{% if admission.admission_reason %}<br>{{ admission.admission_reason }}{% endif %}</td>
+                    <td>{{ admission.releasing_facility or '—' }}</td>
+                    <td>{{ admission.released_at.strftime('%Y-%m-%d %H:%M') if admission.released_at else (admission.release_date or '—') }}</td>
+                    <td>{{ admission.release_type or '—' }}{% if admission.transfer_to %}<br>To: {{ admission.transfer_to }}{% endif %}</td>
+                    <td>{{ admission.release_notes or '—' }}</td>
+                    <td>UGX {{ '{:,.2f}'.format(admission.release_cash_amount or 0) }}<br>{{ admission.release_property_claims or 'No property notes' }}</td>
+                    <td>{{ '{:.2f}%'.format(admission.release_fingerprint_score) if admission.release_fingerprint_score is not none else 'Not recorded' }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <p class="mb-4">No admission history recorded.</p>
+    {% endif %}
+
+    <h5 class="border-bottom pb-2">Disciplinary history</h5>
+    {% if disciplinary_logs %}
+    <div class="table-responsive mb-4">
+        <table class="table table-sm table-bordered align-middle">
+            <thead>
+                <tr>
+                    <th>Date / time</th>
+                    <th>Incident</th>
+                    <th>Violent</th>
+                    <th>What happened / was attempted</th>
+                    <th>People injured</th>
+                    <th>Witnesses</th>
+                    <th>Action / punishment</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for log in disciplinary_logs %}
+                <tr>
+                    <td>{{ log.incident_date }}{% if log.incident_time %} {{ log.incident_time.strftime('%H:%M') }}{% endif %}</td>
+                    <td>{{ log.incident_type or '—' }}</td>
+                    <td>
+                        {% if log.is_violent is true %}Yes
+                        {% elif log.is_violent is false %}No
+                        {% else %}Not classified{% endif %}
+                    </td>
+                    <td>{{ log.description or '—' }}</td>
+                    <td>{{ log.injured_count if log.injured_count is not none else 'Not recorded' }}</td>
+                    <td>{{ log.witnesses or '—' }}</td>
+                    <td>{{ log.action_taken or '—' }}{% if log.punishment_assigned %}<br><strong>Punishment:</strong> {{ log.punishment_assigned }}{% endif %}
+                        {% if log.punishment_start_date or log.punishment_end_date %}<br>{{ log.punishment_start_date or '—' }} to {{ log.punishment_end_date or '—' }}{% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <p class="mb-4">No disciplinary incidents recorded.</p>
+    {% endif %}
+
+    <h5 class="border-bottom pb-2">Escape history</h5>
+    {% if escape_attempt_logs %}
+    <div class="table-responsive mb-4">
+        <table class="table table-sm table-bordered align-middle">
+            <thead>
+                <tr>
+                    <th>Date / time</th>
+                    <th>What was attempted</th>
+                    <th>Outcome</th>
+                    <th>Response / action taken</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for event in escape_attempt_logs %}
+                <tr>
+                    <td>{{ event.incident_date }} {{ event.incident_time.strftime('%H:%M') }}</td>
+                    <td>{{ event.description }}</td>
+                    <td>{{ event.outcome or '—' }}</td>
+                    <td>{{ event.action_taken or '—' }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% elif episode.inmate.escape_attempt_history %}
+    <p class="mb-4">Escape history is flagged, but no incident details have been entered yet.</p>
+    {% else %}
+    <p class="mb-4">No escape attempts recorded.</p>
+    {% endif %}
+
+    <h5 class="border-bottom pb-2">Work-transfer history</h5>
+    {% if work_transfer_logs %}
+    <div class="table-responsive mb-4">
+        <table class="table table-sm table-bordered align-middle">
+            <thead><tr><th>Destination / assignment</th><th>Checked out</th><th>Checked in</th><th>Time out</th><th>Fingerprint confirmation</th></tr></thead>
+            <tbody>
+                {% for transfer in work_transfer_logs %}
+                <tr>
+                    <td>{{ transfer.work_location }}{% if transfer.work_description %}<br>{{ transfer.work_description }}{% endif %}</td>
+                    <td>{{ transfer.checked_out_at.strftime('%Y-%m-%d %H:%M') }}{% if transfer.checkout_officer %}<br>{{ transfer.checkout_officer.full_name }}{% endif %}</td>
+                    <td>{{ transfer.checked_in_at.strftime('%Y-%m-%d %H:%M') if transfer.checked_in_at else 'Still out' }}{% if transfer.checkin_officer %}<br>{{ transfer.checkin_officer.full_name }}{% endif %}</td>
+                    <td>{% if transfer.time_out is not none %}{{ transfer.time_out }} minutes{% else %}In progress{% endif %}</td>
+                    <td>Out: {{ '{:.2f}'.format(transfer.checkout_fingerprint_score) }}%
+                        {% if transfer.checkin_fingerprint_score is not none %}<br>In: {{ '{:.2f}'.format(transfer.checkin_fingerprint_score) }}%{% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <p class="mb-4">No work transfers recorded.</p>
+    {% endif %}
+
+    {% if show_visits %}
+    <h5 class="border-bottom pb-2">Visit history</h5>
+    {% if visit_logs %}
+    <div class="table-responsive mb-4">
+        <table class="table table-sm table-bordered align-middle">
+            <thead><tr><th>Visitor</th><th>Date / times</th><th>Type / relationship</th><th>Purpose / items</th><th>Status</th></tr></thead>
+            <tbody>
+                {% for visit in visit_logs %}
+                <tr>
+                    <td>{{ visit.visitor.full_name if visit.visitor else 'Visitor record unavailable' }}</td>
+                    <td>{{ visit.check_in_time.strftime('%Y-%m-%d %H:%M') if visit.check_in_time else '—' }}<br>{{ visit.check_out_time.strftime('%Y-%m-%d %H:%M') if visit.check_out_time else 'Not checked out' }}</td>
+                    <td>{{ visit.visit_type or '—' }}{% if visit.relationship %}<br>{{ visit.relationship }}{% endif %}</td>
+                    <td>{{ visit.purpose_of_visit or '—' }}{% if visit.items_brought %}<br>Items: {{ visit.items_brought }}{% endif %}</td>
+                    <td>{{ visit.display_status }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <p class="mb-4">No visits recorded.</p>
+    {% endif %}
+    {% endif %}
 
     <h5 class="border-bottom pb-2">Discharge details</h5>
     <div class="row g-3 mb-4">
         <div class="col-6"><strong>Discharge type:</strong> {{ episode.release_type or '—' }}</div>
+        {% if episode.release_type == 'Transfer' %}
+        <div class="col-6"><strong>Transferred to:</strong> {{ episode.transfer_to or '—' }}</div>
+        {% endif %}
         <div class="col-6"><strong>Discharged at:</strong>
             {{ episode.released_at.strftime('%Y-%m-%d %H:%M:%S') if episode.released_at else (episode.release_date or '—') }}
             EAT
@@ -81,13 +325,18 @@
 {% block page_styles %}
 <style>
 .discharge-document { max-width: 900px; min-height: 900px; color: #172b4d; }
+.inmate-photo { width: 150px; height: 180px; object-fit: cover; border: 1px solid #9aa5b1; }
+.photo-placeholder { display: flex; align-items: center; justify-content: center; padding: 1rem; color: #667085; }
 @media print {
-    @page { size: A4; margin: 16mm; }
+    @page { size: A4; margin: 12mm; }
     body { background: #fff !important; }
     body > nav, body > footer, .screen-only { display: none !important; }
     main.container { width: 100% !important; max-width: none !important; padding: 0 !important; margin: 0 !important; }
     .discharge-document { max-width: none; min-height: 0; border: 0 !important; padding: 0 !important; }
     .discharge-document, .discharge-document * { color: #000 !important; }
+    h5, thead { break-after: avoid; }
+    tr, .inmate-photo { break-inside: avoid; }
+    .table-responsive { overflow: visible !important; }
 }
 </style>
 {% endblock %}

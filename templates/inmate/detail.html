@@ -116,6 +116,260 @@
             </div>
         </div>
 
+        <div class="card shadow-sm border-0 mt-3">
+            <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+                <span><i class="bi bi-exclamation-triangle"></i> Disciplinary History</span>
+                {% if inmate.violence_history %}
+                <span class="badge bg-danger">Violence history</span>
+                {% else %}
+                <span class="badge bg-success">No violence recorded</span>
+                {% endif %}
+            </div>
+            {% if has_permission(Permissions.DISCIPLINARY_CREATE) %}
+            <div class="card-body border-bottom d-print-none">
+                <h6>Record an incident</h6>
+                <form method="post"
+                      action="{{ url_for('inmate.add_disciplinary_log', inmate_id=inmate.inmate_id) }}">
+                    <div class="row g-2">
+                        <div class="col-md-4">
+                            <label class="form-label" for="incident_type">Incident type</label>
+                            <input class="form-control" id="incident_type" name="incident_type"
+                                   maxlength="100" placeholder="e.g. Fighting" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label" for="incident_date">Date</label>
+                            <input class="form-control" type="date" id="incident_date"
+                                   name="incident_date" value="{{ today }}" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label" for="incident_time">Time</label>
+                            <input class="form-control" type="time" id="incident_time"
+                                   name="incident_time" required>
+                        </div>
+                        <div class="col-md-8">
+                            <label class="form-label" for="description">What happened or was attempted?</label>
+                            <textarea class="form-control" id="description" name="description"
+                                      rows="2" maxlength="4000" required></textarea>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label" for="injured_count">People injured</label>
+                            <input class="form-control" type="number" id="injured_count"
+                                   name="injured_count" min="0" step="1" placeholder="Leave blank if unknown">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label" for="action_taken">Action taken</label>
+                            <textarea class="form-control" id="action_taken" name="action_taken"
+                                      rows="2" maxlength="2000"></textarea>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label" for="witnesses">Witnesses</label>
+                            <textarea class="form-control" id="witnesses" name="witnesses"
+                                      rows="2" maxlength="2000"></textarea>
+                        </div>
+                        <div class="col-12">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="is_violent"
+                                       name="is_violent">
+                                <label class="form-check-label" for="is_violent">
+                                    Mark this as a violent incident
+                                </label>
+                            </div>
+                        </div>
+                        <div class="col-12">
+                            <button class="btn btn-danger btn-sm" type="submit">
+                                <i class="bi bi-plus-circle"></i> Save incident
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            {% endif %}
+            <div class="card-body">
+                {% for log in disciplinary_logs %}
+                <article class="border rounded p-3 mb-3">
+                    <div class="d-flex justify-content-between flex-wrap gap-2">
+                        <strong>{{ log.incident_type or 'Disciplinary incident' }}</strong>
+                        <span class="badge
+                            {% if log.is_violent is true %}bg-danger
+                            {% elif log.is_violent is false %}bg-secondary
+                            {% else %}bg-light text-dark{% endif %}">
+                            {% if log.is_violent is true %}Violent
+                            {% elif log.is_violent is false %}Non-violent
+                            {% else %}Not classified{% endif %}
+                        </span>
+                    </div>
+                    <div class="small text-muted mb-2">
+                        {{ log.incident_date }}
+                        {% if log.incident_time %} at {{ log.incident_time.strftime('%H:%M') }}{% endif %}
+                    </div>
+                    <div><strong>What happened / was attempted:</strong> {{ log.description or '—' }}</div>
+                    <div><strong>People injured:</strong>
+                        {{ log.injured_count if log.injured_count is not none else 'Not recorded' }}
+                    </div>
+                    {% if log.action_taken %}<div><strong>Action taken:</strong> {{ log.action_taken }}</div>{% endif %}
+                    {% if log.witnesses %}<div><strong>Witnesses:</strong> {{ log.witnesses }}</div>{% endif %}
+                    {% if log.punishment_assigned %}<div><strong>Sanction:</strong> {{ log.punishment_assigned }}</div>{% endif %}
+                </article>
+                {% else %}
+                <p class="text-muted mb-0">No disciplinary incidents recorded.</p>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="card shadow-sm border-0 mt-3">
+            <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+                <span><i class="bi bi-door-open"></i> Escape History</span>
+                {% if inmate.escape_attempt_history %}
+                <span class="badge bg-danger">History recorded</span>
+                {% else %}
+                <span class="badge bg-success">No escape attempt recorded</span>
+                {% endif %}
+            </div>
+            {% if has_permission(Permissions.DISCIPLINARY_CREATE) %}
+            <div class="card-body border-bottom d-print-none">
+                <h6>Record an escape attempt</h6>
+                <form method="post"
+                      action="{{ url_for('inmate.add_escape_attempt', inmate_id=inmate.inmate_id) }}">
+                    <div class="row g-2">
+                        <div class="col-md-4">
+                            <label class="form-label" for="escape_incident_date">Date</label>
+                            <input class="form-control" type="date" id="escape_incident_date"
+                                   name="incident_date" value="{{ today }}" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label" for="escape_incident_time">Time</label>
+                            <input class="form-control" type="time" id="escape_incident_time"
+                                   name="incident_time" required>
+                        </div>
+                        <div class="col-md-12">
+                            <label class="form-label" for="escape_description">What was attempted?</label>
+                            <textarea class="form-control" id="escape_description" name="description"
+                                      rows="2" maxlength="4000" required></textarea>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label" for="escape_outcome">Outcome</label>
+                            <textarea class="form-control" id="escape_outcome" name="outcome"
+                                      rows="2" maxlength="2000"
+                                      placeholder="e.g. Prevented before leaving the facility"></textarea>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label" for="escape_action_taken">Response / action taken</label>
+                            <textarea class="form-control" id="escape_action_taken" name="action_taken"
+                                      rows="2" maxlength="2000"></textarea>
+                        </div>
+                        <div class="col-12">
+                            <button class="btn btn-danger btn-sm" type="submit">
+                                <i class="bi bi-plus-circle"></i> Save escape history
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            {% endif %}
+            <div class="card-body">
+                {% for event in escape_attempt_logs %}
+                <article class="border rounded p-3 mb-3">
+                    <strong>Escape attempt</strong>
+                    <div class="small text-muted mb-2">
+                        {{ event.incident_date }} at {{ event.incident_time.strftime('%H:%M') }}
+                    </div>
+                    <div><strong>What was attempted:</strong> {{ event.description }}</div>
+                    {% if event.outcome %}<div><strong>Outcome:</strong> {{ event.outcome }}</div>{% endif %}
+                    {% if event.action_taken %}<div><strong>Response / action:</strong> {{ event.action_taken }}</div>{% endif %}
+                </article>
+                {% else %}
+                    {% if inmate.escape_attempt_history %}
+                    <p class="text-muted mb-0">
+                        Escape history is flagged, but no incident details have been entered yet.
+                    </p>
+                    {% else %}
+                    <p class="text-muted mb-0">No escape attempts recorded.</p>
+                    {% endif %}
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="card shadow-sm border-0 mt-3" id="workTransferHistory">
+            <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+                <span><i class="bi bi-briefcase"></i> Temporary Work Transfers</span>
+                {% if current_work_transfer %}
+                <span class="badge bg-warning text-dark">Out for work</span>
+                {% else %}
+                <span class="badge bg-success">Inside</span>
+                {% endif %}
+            </div>
+            {% if has_permission(Permissions.INMATE_RELEASE) %}
+            <div class="card-body border-bottom d-print-none">
+                {% if current_work_transfer %}
+                <p class="mb-2">
+                    Currently out at <strong>{{ current_work_transfer.work_location }}</strong>
+                    since {{ current_work_transfer.checked_out_at.strftime('%Y-%m-%d %H:%M') }}.
+                    Scan the inmate’s fingerprint to check them back in.
+                </p>
+                <form class="work-transfer-form"
+                      data-endpoint="{{ url_for('inmate.work_transfer_action', inmate_id=inmate.inmate_id, action='checkin') }}">
+                    <button type="submit" class="btn btn-success btn-sm">
+                        <i class="bi bi-fingerprint"></i> Scan fingerprint and check in
+                    </button>
+                </form>
+                {% else %}
+                <h6>Check an inmate out for work</h6>
+                <form class="work-transfer-form"
+                      data-endpoint="{{ url_for('inmate.work_transfer_action', inmate_id=inmate.inmate_id, action='checkout') }}">
+                    <div class="row g-2">
+                        <div class="col-md-5">
+                            <label class="form-label" for="work_location">Work location</label>
+                            <input class="form-control" id="work_location" name="work_location"
+                                   maxlength="200" required>
+                        </div>
+                        <div class="col-md-7">
+                            <label class="form-label" for="work_description">Work / assignment details</label>
+                            <input class="form-control" id="work_description" name="work_description"
+                                   maxlength="2000">
+                        </div>
+                        <div class="col-12">
+                            <button type="submit" class="btn btn-warning btn-sm">
+                                <i class="bi bi-fingerprint"></i> Scan fingerprint and check out
+                            </button>
+                        </div>
+                    </div>
+                </form>
+                {% endif %}
+                <div class="work-transfer-result small mt-2" role="status" aria-live="polite"></div>
+            </div>
+            {% endif %}
+            <div class="card-body">
+                {% for transfer in work_transfer_logs %}
+                <article class="border rounded p-3 mb-3">
+                    <div class="d-flex justify-content-between flex-wrap gap-2">
+                        <strong>{{ transfer.work_location }}</strong>
+                        {% if transfer.is_out %}
+                        <span class="badge bg-warning text-dark">Out for work</span>
+                        {% else %}
+                        <span class="badge bg-success">Inside</span>
+                        {% endif %}
+                    </div>
+                    {% if transfer.work_description %}
+                    <div>{{ transfer.work_description }}</div>
+                    {% endif %}
+                    <div class="small text-muted">
+                        Checked out: {{ transfer.checked_out_at.strftime('%Y-%m-%d %H:%M') }}
+                        {% if transfer.checked_in_at %}
+                        · Checked in: {{ transfer.checked_in_at.strftime('%Y-%m-%d %H:%M') }}
+                        · Time out:
+                            {% set minutes = transfer.time_out %}
+                            {% if minutes >= 60 %}{{ minutes // 60 }}h {% endif %}{{ minutes % 60 }}m
+                        {% else %}
+                        · Awaiting fingerprint check-in
+                        {% endif %}
+                    </div>
+                </article>
+                {% else %}
+                <p class="text-muted mb-0">No work transfers recorded.</p>
+                {% endfor %}
+            </div>
+        </div>
+
         {% if has_permission(Permissions.MEDICAL_RECORD_VIEW) %}
         <div class="card shadow-sm border-0 mt-3">
                 <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
@@ -217,7 +471,15 @@
             <div class="card-body">
                 <dl class="row mb-0">
                     <dt class="col-6">Status</dt>
-                    <dd class="col-6"><span class="badge bg-success">{{ inmate.status }}</span></dd>
+                    <dd class="col-6">
+                        {% if current_work_transfer %}
+                        <span class="badge bg-warning text-dark">Out for work</span>
+                        {% elif inmate.status == 'Active' %}
+                        <span class="badge bg-success">Inside</span>
+                        {% else %}
+                        <span class="badge bg-secondary">{{ inmate.status }}</span>
+                        {% endif %}
+                    </dd>
                     <dt class="col-6">Cell</dt>
                     <dd class="col-6">{{ inmate.cell_block or '—' }} / {{ inmate.cell_number or '—' }}</dd>
                     <dt class="col-6">Total admissions</dt><dd class="col-6">{{ inmate.total_admissions }}</dd>
@@ -257,4 +519,39 @@
     </div>
 </div>
 {% endif %}
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+document.querySelectorAll('.work-transfer-form').forEach(form => {
+    form.addEventListener('submit', async event => {
+        event.preventDefault();
+        const button = form.querySelector('button[type="submit"]');
+        const result = form.parentElement.querySelector('.work-transfer-result');
+        const payload = Object.fromEntries(new FormData(form).entries());
+        button.disabled = true;
+        result.className = 'work-transfer-result small mt-2 text-muted';
+        result.textContent = 'Waiting for fingerprint scan…';
+        try {
+            const response = await fetch(form.dataset.endpoint, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            const data = await response.json();
+            if (!response.ok || !data.ok) {
+                throw new Error(data.error || 'Work transfer could not be recorded.');
+            }
+            result.className = 'work-transfer-result small mt-2 text-success';
+            result.textContent = `${data.message} Match: ${data.score}%.`;
+            window.location.reload();
+        } catch (error) {
+            result.className = 'work-transfer-result small mt-2 text-danger';
+            result.textContent = error.message;
+            button.disabled = false;
+        }
+    });
+});
+</script>
 {% endblock %}
