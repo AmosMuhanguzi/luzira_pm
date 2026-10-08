@@ -6,7 +6,7 @@
             <a href="{{ url_for('visitor.list_visitors') }}"
                class="list-group-item list-group-item-action
                       {{ 'active' if request.endpoint == 'visitor.list_visitors' }}">
-                <i class="bi bi-people"></i> All Visitors
+                <img class="visitor-icon" src="{{ url_for('static', filename='images/visitor-icon.png') }}" alt=""> All Visitors
             </a>
             <a href="{{ url_for('visitor.scan') }}"
                class="list-group-item list-group-item-action

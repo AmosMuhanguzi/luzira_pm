@@ -7,6 +7,7 @@ from datetime import datetime, date
 from extensions import db
 from models.edit_request import EditRequest
 from models.inmate import Inmate
+from models.visitor import Visitor
 from models.audit import AuditEvent
 
 
@@ -26,12 +27,28 @@ INMATE_EDITABLE_FIELDS = {
     'risk_level': str,
 }
 
+VISITOR_EDITABLE_FIELDS = {
+    'full_name': str,
+    'date_of_birth': 'date',
+    'gender': str,
+    'nationality': str,
+    'national_id_number': str,
+    'passport_number': str,
+    'phone_number': str,
+    'email': str,
+    'address': str,
+    'relationship_type': str,
+}
+
 
 class EditRequestService:
 
     # ---------- Submit ----------
     @staticmethod
-    def submit_inmate_edit(actor, inmate_id, form_data: dict, reason: str = None):
+    def submit_inmate_edit(
+        actor, inmate_id, form_data: dict, reason: str = None,
+        photo_path: str = None,
+    ):
         """
         Build a diff from form_data vs the current inmate, create an EditRequest.
         Returns (edit_request, error)
@@ -54,6 +71,12 @@ class EditRequestService:
                     'old': _serialize(old_val),
                     'new': _serialize(new_val),
                 }
+
+        if photo_path and not _equal(inmate.photo_path, photo_path):
+            changes['photo_path'] = {
+                'old': _serialize(inmate.photo_path),
+                'new': _serialize(photo_path),
+            }
 
         if not changes:
             return None, 'No changes detected. Modify at least one field.'
@@ -86,6 +109,66 @@ class EditRequestService:
         db.session.commit()
         return req, None
 
+    @staticmethod
+    def submit_visitor_edit(
+        actor, visitor_id, form_data: dict, reason: str = None,
+        photo_path: str = None,
+    ):
+        visitor = Visitor.query.get(visitor_id)
+        if not visitor:
+            return None, 'Visitor not found.'
+
+        changes = {}
+        for field, ftype in VISITOR_EDITABLE_FIELDS.items():
+            if field not in form_data:
+                continue
+            old_value = getattr(visitor, field)
+            new_value = _coerce(form_data[field], ftype)
+            if not _equal(old_value, new_value):
+                changes[field] = {
+                    'old': _serialize(old_value),
+                    'new': _serialize(new_value),
+                }
+
+        if photo_path and not _equal(visitor.photo_path, photo_path):
+            changes['photo_path'] = {
+                'old': _serialize(visitor.photo_path),
+                'new': _serialize(photo_path),
+            }
+
+        if not changes:
+            return None, 'No changes detected. Modify at least one field.'
+
+        visitor_label = visitor.visitor_number or f'Visitor #{visitor.visitor_id}'
+        req = EditRequest(
+            target_type='Visitor',
+            target_id=visitor.visitor_id,
+            target_label=f'{visitor_label} — {visitor.full_name}',
+            requested_by=actor.user_id,
+            request_reason=(reason or '').strip() or None,
+        )
+        req.set_changes(changes)
+        req.status = 'Pending'
+        db.session.add(req)
+        db.session.commit()
+
+        AuditEvent.log_event(
+            event_category='EditRequest',
+            event_type='Submit',
+            event_description=(
+                f'Edit request #{req.request_id} submitted for visitor '
+                f'{visitor_label} ({len(changes)} field(s))'
+            ),
+            entity_type='EditRequest',
+            entity_id=req.request_id,
+            user_id=actor.user_id,
+            username=actor.username,
+            user_role=actor.role_name,
+            success=True,
+        )
+        db.session.commit()
+        return req, None
+
     # ---------- Apply / Reject ----------
     @staticmethod
     def approve(actor, request_id, notes: str = None):
@@ -95,19 +178,35 @@ class EditRequestService:
         if req.status != 'Pending':
             return False, f'Request is already {req.status.lower()}.'
 
-        if req.target_type != 'Inmate':
+        if req.target_type == 'Inmate':
+            target = Inmate.query.get(req.target_id)
+            editable_fields = {**INMATE_EDITABLE_FIELDS, 'photo_path': str}
+            target_description = (
+                f'inmate {target.inmate_number}' if target else 'inmate'
+            )
+        elif req.target_type == 'Visitor':
+            target = Visitor.query.get(req.target_id)
+            editable_fields = {**VISITOR_EDITABLE_FIELDS, 'photo_path': str}
+            target_id = target.visitor_id if target else req.target_id
+            visitor_label = (
+                (target.visitor_number or f'#{target.visitor_id}')
+                if target else f'#{req.target_id}'
+            )
+            target_description = f'visitor {visitor_label}' if target else 'visitor'
+        else:
             return False, f'Unsupported target type: {req.target_type}'
 
-        inmate = Inmate.query.get(req.target_id)
-        if not inmate:
-            return False, 'Target inmate no longer exists.'
+        if not target:
+            return False, f'Target {req.target_type.lower()} no longer exists.'
+        if req.target_type == 'Inmate':
+            target_id = target.inmate_id
 
         # Apply each change
         for field, delta in req.changes.items():
-            ftype = INMATE_EDITABLE_FIELDS.get(field)
+            ftype = editable_fields.get(field)
             if ftype is None:
                 continue   # field no longer editable; skip
-            setattr(inmate, field, _coerce(delta['new'], ftype))
+            setattr(target, field, _coerce(delta['new'], ftype))
 
         req.status = 'Approved'
         req.reviewed_by = actor.user_id
@@ -121,10 +220,10 @@ class EditRequestService:
             event_type='Approve',
             event_description=(
                 f'Edit request #{req.request_id} approved '
-                f'({len(req.changes)} field(s)) for inmate {inmate.inmate_number}'
+                f'({len(req.changes)} field(s)) for {target_description}'
             ),
-            entity_type='Inmate',
-            entity_id=inmate.inmate_id,
+            entity_type=req.target_type,
+            entity_id=target_id,
             user_id=actor.user_id, username=actor.username, user_role=actor.role_name,
             success=True,
         )

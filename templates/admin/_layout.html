@@ -19,7 +19,7 @@
             <a href="{{ url_for('admin.cells') }}"
                class="list-group-item list-group-item-action
                       {{ 'active' if request.endpoint in ['admin.cells', 'admin.cell_delete'] }}">
-                <i class="bi bi-building"></i> Cell Blocks
+               <img class="cell-block-icon" src="{{ url_for('static', filename='images/cell-block-icon.png') }}" alt=""> Cell Blocks
             </a>
         </div>
     </div>

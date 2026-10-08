@@ -10,6 +10,36 @@
     </a>
 </div>
 
+{% if req.changes.get('photo_path') %}
+<div class="card shadow-sm border-0 mb-3">
+    <div class="card-header bg-dark text-white">Requested photo change</div>
+    <div class="card-body">
+        <div class="row g-3">
+            <div class="col-md-6 text-center">
+                <h6>Current photo</h6>
+                {% if inmate and inmate.photo_path %}
+                <img class="person-photo-detail mx-auto" style="max-width: 240px;"
+                     src="{{ url_for('inmate.photo', inmate_id=inmate.inmate_id, filename=inmate.photo_path) }}"
+                     alt="Current photo of {{ inmate.full_name }}">
+                {% elif visitor and visitor.photo_path %}
+                <img class="person-photo-detail mx-auto" style="max-width: 240px;"
+                     src="{{ url_for('visitor.photo', visitor_id=visitor.visitor_id, filename=visitor.photo_path) }}"
+                     alt="Current photo of {{ visitor.full_name }}">
+                {% else %}
+                <p class="text-muted">No current photo.</p>
+                {% endif %}
+            </div>
+            <div class="col-md-6 text-center">
+                <h6>Proposed photo</h6>
+                <img class="person-photo-detail mx-auto" style="max-width: 240px;"
+                     src="{{ url_for('edit_requests.request_photo', request_id=req.request_id) }}"
+                     alt="Proposed profile photo">
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
 <div class="card shadow-sm border-0 mb-3">
     <div class="card-body">
         <dl class="row mb-0">
@@ -18,6 +48,9 @@
                 {{ req.target_label or ('%s #%d' % (req.target_type, req.target_id)) }}
                 {% if inmate %}
                 · <a href="{{ url_for('inmate.detail', inmate_id=inmate.inmate_id) }}">View inmate</a>
+                {% endif %}
+                {% if visitor %}
+                · <a href="{{ url_for('visitor.detail', visitor_id=visitor.visitor_id) }}">View visitor</a>
                 {% endif %}
             </dd>
 

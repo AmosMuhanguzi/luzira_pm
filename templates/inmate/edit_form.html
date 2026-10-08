@@ -26,6 +26,17 @@
 
 <form method="POST" novalidate>
     <input type="hidden" name="target_label" value="{{ inmate.inmate_number }}">
+    {% if inmate.photo_path %}
+    <div class="card shadow-sm border-0 mb-3">
+        <div class="card-body d-flex flex-wrap align-items-center gap-3">
+            <img class="person-photo-detail" style="width: 120px; height: 140px;"
+                 src="{{ url_for('inmate.photo', inmate_id=inmate.inmate_id, filename=inmate.photo_path) }}"
+                 alt="Current photo of {{ inmate.full_name }}">
+            <div><strong>Current profile photo</strong><div class="small text-muted">Capture a new photo below to request a replacement.</div></div>
+        </div>
+    </div>
+    {% endif %}
+    {% include 'person_photo_capture.html' %}
 
     <div class="card shadow-sm border-0 mb-3">
         <div class="card-header bg-dark text-white"><i class="bi bi-person"></i> Personal</div>
@@ -197,4 +208,5 @@
         </button>
     </div>
 </form>
+<script src="{{ url_for('static', filename='js/person-photo-capture.js') }}"></script>
 {% endblock %}

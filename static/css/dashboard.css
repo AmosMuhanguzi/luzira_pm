@@ -126,6 +126,11 @@
     font-size: 1.05rem;
 }
 
+.dashboard-kpi-image {
+    padding: 0.3rem;
+    object-fit: contain;
+}
+
 .dashboard-kpi .fs-3 {
     color: var(--kpi-ink);
     font-size: clamp(1.45rem, 1.8vw, 1.9rem) !important;

@@ -1,0 +1,119 @@
+{% extends "visitor/_layout.html" %}
+{% block title %}Request Visitor Edit — Luzira PMS{% endblock %}
+
+{% block visitor_content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <h3 class="mb-1">Request visitor record edit</h3>
+        <p class="text-muted mb-0">
+            {{ visitor.visitor_number or ('Visitor #' ~ visitor.visitor_id) }} · {{ visitor.full_name }}
+        </p>
+    </div>
+    <a href="{{ url_for('visitor.detail', visitor_id=visitor.visitor_id) }}"
+       class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-arrow-left"></i> Back to visitor
+    </a>
+</div>
+
+<div class="alert alert-info">
+    Submitted changes remain pending and will not update the visitor record until an administrator approves them.
+</div>
+
+<form method="POST">
+    {% if visitor.photo_path %}
+    <div class="card shadow-sm border-0 mb-3">
+        <div class="card-body d-flex flex-wrap align-items-center gap-3">
+            <img class="person-photo-detail" style="width: 120px; height: 140px;"
+                 src="{{ url_for('visitor.photo', visitor_id=visitor.visitor_id, filename=visitor.photo_path) }}"
+                 alt="Current photo of {{ visitor.full_name }}">
+            <div><strong>Current profile photo</strong><div class="small text-muted">Capture a new photo below to request a replacement.</div></div>
+        </div>
+    </div>
+    {% endif %}
+    {% include 'person_photo_capture.html' %}
+    <div class="card shadow-sm border-0 mb-3">
+        <div class="card-header bg-dark text-white">Proposed visitor information</div>
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label" for="full_name">Full name</label>
+                    <input class="form-control" id="full_name" name="full_name"
+                           maxlength="150" required
+                           value="{{ data.get('full_name', visitor.full_name) or '' }}">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label" for="date_of_birth">Date of birth</label>
+                    <input class="form-control" type="date" id="date_of_birth" name="date_of_birth"
+                           value="{{ data.get('date_of_birth', visitor.date_of_birth.isoformat() if visitor.date_of_birth else '') }}">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label" for="gender">Gender</label>
+                    {% set gender = data.get('gender', visitor.gender or '') %}
+                    <select class="form-select" id="gender" name="gender">
+                        <option value="">Select</option>
+                        {% for option in ['Male', 'Female'] %}
+                        <option value="{{ option }}" {{ 'selected' if gender == option }}>{{ option }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label" for="nationality">Nationality</label>
+                    <input class="form-control" id="nationality" name="nationality" maxlength="50"
+                           value="{{ data.get('nationality', visitor.nationality or '') }}">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label" for="national_id_number">National ID number</label>
+                    <input class="form-control" id="national_id_number" name="national_id_number" maxlength="50"
+                           value="{{ data.get('national_id_number', visitor.national_id_number or '') }}">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label" for="passport_number">Passport number</label>
+                    <input class="form-control" id="passport_number" name="passport_number" maxlength="50"
+                           value="{{ data.get('passport_number', visitor.passport_number or '') }}">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label" for="phone_number">Phone number</label>
+                    <input class="form-control" id="phone_number" name="phone_number" maxlength="20" required
+                           value="{{ data.get('phone_number', visitor.phone_number or '') }}">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label" for="email">Email</label>
+                    <input class="form-control" type="email" id="email" name="email" maxlength="255"
+                           value="{{ data.get('email', visitor.email or '') }}">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label" for="relationship_type">Relationship to inmate</label>
+                    {% set relationship = data.get('relationship_type', visitor.relationship_type or '') %}
+                    <select class="form-select" id="relationship_type" name="relationship_type">
+                        <option value="">Select</option>
+                        {% for option in ['Spouse', 'Parent', 'Sibling', 'Child', 'Friend', 'Lawyer', 'Clergy', 'Other'] %}
+                        <option value="{{ option }}" {{ 'selected' if relationship == option }}>{{ option }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-12">
+                    <label class="form-label" for="address">Physical address</label>
+                    <textarea class="form-control" id="address" name="address" rows="3">{{ data.get('address', visitor.address or '') }}</textarea>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card shadow-sm border-0 mb-3">
+        <div class="card-body">
+            <label class="form-label" for="request_reason">Reason for the requested changes</label>
+            <textarea class="form-control" id="request_reason" name="request_reason"
+                      rows="3" maxlength="2000" required>{{ data.get('request_reason', '') }}</textarea>
+        </div>
+    </div>
+
+    <div class="d-flex justify-content-end gap-2 mb-4">
+        <a href="{{ url_for('visitor.detail', visitor_id=visitor.visitor_id) }}"
+           class="btn btn-outline-secondary">Cancel</a>
+        <button type="submit" class="btn btn-primary">
+            <i class="bi bi-send"></i> Submit edit request
+        </button>
+    </div>
+</form>
+<script src="{{ url_for('static', filename='js/person-photo-capture.js') }}"></script>
+{% endblock %}

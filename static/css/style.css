@@ -48,6 +48,60 @@ body {
     height: 1.65rem;
 }
 
+.inmate-icon {
+    width: 1.25rem;
+    height: 1.25rem;
+    margin-right: 0.15rem;
+    object-fit: contain;
+    vertical-align: -0.2rem;
+}
+
+.inmate-icon--nav {
+    width: 1rem;
+    height: 1rem;
+}
+
+.inmate-icon--heading {
+    width: 1.65rem;
+    height: 1.65rem;
+}
+
+.cell-block-icon {
+    width: 1.25rem;
+    height: 1.25rem;
+    margin-right: 0.15rem;
+    object-fit: contain;
+    vertical-align: -0.2rem;
+}
+
+.cell-block-icon--nav {
+    width: 1rem;
+    height: 1rem;
+}
+
+.cell-block-icon--heading {
+    width: 1.65rem;
+    height: 1.65rem;
+}
+
+.visitor-icon {
+    width: 1.25rem;
+    height: 1.25rem;
+    margin-right: 0.15rem;
+    object-fit: contain;
+    vertical-align: -0.2rem;
+}
+
+.visitor-icon--nav {
+    width: 1rem;
+    height: 1rem;
+}
+
+.visitor-icon--heading {
+    width: 1.65rem;
+    height: 1.65rem;
+}
+
 .alert {
     border-radius: 0.5rem;
 }

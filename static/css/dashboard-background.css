@@ -22,7 +22,7 @@
     filter: blur(3px);
     opacity: 0;
     transform: scale(1.06);
-    animation: dashboard-slide-show 27s ease-in-out infinite;
+    animation: dashboard-slide-show 54s ease-in-out infinite;
     will-change: opacity, transform;
 }
 
@@ -39,6 +39,21 @@
 .dashboard-slide-yard {
     background-image: url("../images/luzira-recreation-yard.png");
     animation-delay: 18s;
+}
+
+.dashboard-slide-gate-additional {
+    background-image: url("../images/luzira-gate-additional.png");
+    animation-delay: 27s;
+}
+
+.dashboard-slide-prison-yard {
+    background-image: url("../images/luzira-prison-yard.png");
+    animation-delay: 36s;
+}
+
+.dashboard-slide-prison-activities {
+    background-image: url("../images/luzira-prison-activities.png");
+    animation-delay: 45s;
 }
 
 .dashboard-slide-shade {
@@ -61,14 +76,14 @@
         opacity: 0;
         transform: scale(1.06);
     }
-    5% {
+    3.7% {
         opacity: 1;
     }
-    29% {
+    14% {
         opacity: 1;
         transform: scale(1.12);
     }
-    34%,
+    17%,
     100% {
         opacity: 0;
         transform: scale(1.14);

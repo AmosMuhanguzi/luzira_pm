@@ -48,30 +48,30 @@
                     {% endif %}
                 </a>
                 <a href="{{ url_for('inmate.intake_scan') }}" class="btn btn-sm btn-outline-warning"><i class="bi bi-fingerprint"></i> Intake</a>
-                <a href="{{ url_for('inmate.list_inmates') }}" class="btn btn-sm btn-outline-info"><i class="bi bi-person-vcard"></i> Inmates</a>
-                <a href="{{ url_for('visitor.scan') }}" class="btn btn-sm btn-outline-success"><i class="bi bi-person-check"></i> Visitors</a>
+                <a href="{{ url_for('inmate.list_inmates') }}" class="btn btn-sm btn-outline-info"><img class="inmate-icon" src="{{ url_for('static', filename='images/inmate-icon.png') }}" alt=""> Inmates</a>
+                <a href="{{ url_for('visitor.scan') }}" class="btn btn-sm btn-outline-success"><img class="visitor-icon" src="{{ url_for('static', filename='images/visitor-icon.png') }}" alt=""> Visitors</a>
                 <a href="{{ url_for('ai.dashboard') }}" class="btn btn-sm btn-outline-dark"><i class="bi bi-robot"></i> AI Analytics</a>
 
             {% elif role == 'Warden' %}
-                <a href="{{ url_for('inmate.list_inmates') }}" class="btn btn-sm btn-outline-primary"><i class="bi bi-person-vcard"></i> Inmate Records</a>
+                <a href="{{ url_for('inmate.list_inmates') }}" class="btn btn-sm btn-outline-primary"><img class="inmate-icon" src="{{ url_for('static', filename='images/inmate-icon.png') }}" alt=""> Inmate Records</a>
                 <a href="{{ url_for('edit_requests.my_requests') }}" class="btn btn-sm btn-outline-warning"><i class="bi bi-send-check"></i> My Requests</a>
 
             {% elif role == 'Records Officer' %}
-                <a href="{{ url_for('inmate.list_inmates') }}" class="btn btn-sm btn-outline-primary"><i class="bi bi-person-vcard"></i> Inmate Records</a>
+                <a href="{{ url_for('inmate.list_inmates') }}" class="btn btn-sm btn-outline-primary"><img class="inmate-icon" src="{{ url_for('static', filename='images/inmate-icon.png') }}" alt=""> Inmate Records</a>
                 <a href="{{ url_for('edit_requests.my_requests') }}" class="btn btn-sm btn-outline-warning"><i class="bi bi-send-check"></i> My Requests</a>
 
             {% elif role == 'Receptionist' %}
                 <a href="{{ url_for('inmate.intake_scan') }}" class="btn btn-sm btn-outline-warning"><i class="bi bi-fingerprint"></i> Intake</a>
-                <a href="{{ url_for('inmate.list_inmates') }}" class="btn btn-sm btn-outline-primary"><i class="bi bi-person-vcard"></i> Inmate Records</a>
+                <a href="{{ url_for('inmate.list_inmates') }}" class="btn btn-sm btn-outline-primary"><img class="inmate-icon" src="{{ url_for('static', filename='images/inmate-icon.png') }}" alt=""> Inmate Records</a>
                 <a href="{{ url_for('edit_requests.my_requests') }}" class="btn btn-sm btn-outline-info"><i class="bi bi-send-check"></i> My Requests</a>
-                <a href="{{ url_for('visitor.scan') }}" class="btn btn-sm btn-outline-success"><i class="bi bi-person-check"></i> Visitor Check-in</a>
+                <a href="{{ url_for('visitor.scan') }}" class="btn btn-sm btn-outline-success"><img class="visitor-icon" src="{{ url_for('static', filename='images/visitor-icon.png') }}" alt=""> Visitor Check-in</a>
 
             {% elif role == 'Security Officer' %}
                 <a href="{{ url_for('edit_requests.my_requests') }}" class="btn btn-sm btn-outline-warning"><i class="bi bi-send-check"></i> My Requests</a>
-                <a href="{{ url_for('visitor.scan') }}" class="btn btn-sm btn-outline-success"><i class="bi bi-person-check"></i> Visitor Check-in</a>
+                <a href="{{ url_for('visitor.scan') }}" class="btn btn-sm btn-outline-success"><img class="visitor-icon" src="{{ url_for('static', filename='images/visitor-icon.png') }}" alt=""> Visitor Check-in</a>
 
             {% elif role == 'Medical Officer' %}
-                <a href="{{ url_for('inmate.list_inmates') }}" class="btn btn-sm btn-outline-primary"><i class="bi bi-person-vcard"></i> Inmate Records</a>
+                <a href="{{ url_for('inmate.list_inmates') }}" class="btn btn-sm btn-outline-primary"><img class="inmate-icon" src="{{ url_for('static', filename='images/inmate-icon.png') }}" alt=""> Inmate Records</a>
             {% endif %}
         </div>
     </div>
@@ -85,7 +85,7 @@
             Review inmate records, add medical notes or documents, and track submissions awaiting administrator approval.
         </p>
         <a href="{{ url_for('inmate.list_inmates') }}" class="btn btn-primary">
-            <i class="bi bi-person-vcard"></i> Open Inmate Records
+            <img class="inmate-icon" src="{{ url_for('static', filename='images/inmate-icon.png') }}" alt=""> Open Inmate Records
         </a>
     </div>
 </div>
@@ -95,7 +95,7 @@
     <div class="col-6 col-md-4 col-xl-2">
         <div class="card border-0 shadow-sm h-100 dashboard-kpi dashboard-kpi--inmates">
             <div class="card-body">
-                <div class="dashboard-kpi-label"><span>Inmates (Now / Ever)</span><i class="bi bi-person-vcard-fill dashboard-kpi-icon" aria-hidden="true"></i></div>
+                <div class="dashboard-kpi-label"><span>Inmates (Now / Ever)</span><img class="dashboard-kpi-icon dashboard-kpi-image" src="{{ url_for('static', filename='images/inmate-icon.png') }}" alt=""></div>
                 <div class="fs-3 fw-bold">{{ total_inmates_now|default(0) }} <span class="fs-6 fw-normal">/ {{ total_inmates_ever|default(0) }}</span></div>
             </div>
         </div>
@@ -103,7 +103,7 @@
     <div class="col-6 col-md-4 col-xl-2">
         <div class="card border-0 shadow-sm h-100 dashboard-kpi dashboard-kpi--visitors">
             <div class="card-body">
-                <div class="dashboard-kpi-label"><span>Visitors (Today / Ever)</span><i class="bi bi-people-fill dashboard-kpi-icon" aria-hidden="true"></i></div>
+                <div class="dashboard-kpi-label"><span>Visitors (Today / Ever)</span><img class="dashboard-kpi-icon dashboard-kpi-image" src="{{ url_for('static', filename='images/visitor-icon.png') }}" alt=""></div>
                 <div class="fs-3 fw-bold">{{ total_daily_visits|default(0) }} <span class="fs-6 fw-normal">/ {{ total_visitors_ever|default(0) }}</span></div>
             </div>
         </div>
@@ -135,7 +135,7 @@
     <div class="col-6 col-md-4 col-xl-2">
         <div class="card border-0 shadow-sm h-100 dashboard-kpi dashboard-kpi--occupancy">
             <div class="card-body">
-                <div class="dashboard-kpi-label"><span>Total Occupancy</span><i class="bi bi-building-fill dashboard-kpi-icon" aria-hidden="true"></i></div>
+                <div class="dashboard-kpi-label"><span>Total Occupancy</span><img class="dashboard-kpi-icon dashboard-kpi-image" src="{{ url_for('static', filename='images/cell-block-icon.png') }}" alt=""></div>
                 <div class="fs-3 fw-bold">{{ total_occupied|default(0) }} / {{ total_capacity|default(0) }}</div>
                 <div class="progress dashboard-occupancy-progress mt-2" style="height: 6px;">
                     <div class="progress-bar" style="width: {{ overall_capacity_pct|default(0) }}%;"></div>
@@ -161,7 +161,7 @@
     <div class="col-lg-4">
         <div class="card border-0 shadow-sm h-100 dashboard-panel">
             <div class="card-header bg-white d-flex justify-content-between align-items-center py-3">
-                <span class="fw-bold"><i class="bi bi-building text-secondary"></i> Cell Blocks</span>
+                <span class="fw-bold"><img class="cell-block-icon" src="{{ url_for('static', filename='images/cell-block-icon.png') }}" alt=""> Cell Blocks</span>
                 <span class="badge bg-dark">{{ cell_blocks|length if cell_blocks else 0 }} Blocks</span>
             </div>
             <div class="card-body overflow-auto" style="max-height: 380px;">

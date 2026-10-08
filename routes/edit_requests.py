@@ -1,13 +1,20 @@
 # routes/edit_requests.py
-from flask import Blueprint, render_template, redirect, url_for, flash, request
+from pathlib import Path
+
+from flask import (
+    Blueprint, abort, current_app, flash, redirect, render_template, request,
+    send_from_directory, url_for,
+)
 from flask_login import login_required, current_user
 
 from extensions import csrf
-from services.rbac import require_permission, Permissions
+from services.rbac import has_permission, require_permission, Permissions
 from services.inmate_service import InmateService
 from services.edit_request_service import EditRequestService
+from services.person_photo_service import PersonPhotoService
 from models.inmate import Inmate
 from models.edit_request import EditRequest
+from models.visitor import Visitor
 
 
 edit_bp = Blueprint('edit_requests', __name__)
@@ -27,18 +34,29 @@ def inmate_edit(inmate_id):
     if request.method == 'POST':
         data = request.form.to_dict()
         reason = data.pop('request_reason', None)
+        photo_data = data.pop('photo_data', '')
+        data.pop('photo_path', None)
+        photo_path, photo_error = PersonPhotoService.save_capture(photo_data)
+        if photo_error:
+            flash(photo_error, 'danger')
+            return render_template(
+                'inmate/edit_form.html',
+                inmate=inmate,
+                data={**data, 'photo_data': photo_data},
+            )
 
         # Admin bypasses the queue
-        from services.rbac import has_permission
         if has_permission(Permissions.INMATE_EDIT_APPROVE):
             req, error = EditRequestService.submit_inmate_edit(
                 actor=current_user, inmate_id=inmate_id,
-                form_data=data, reason=reason,
+                form_data=data, reason=reason, photo_path=photo_path,
             )
             if error:
+                PersonPhotoService.delete_photo(photo_path)
                 flash(error, 'danger')
                 return render_template('inmate/edit_form.html',
-                                       inmate=inmate, data=data)
+                                       inmate=inmate,
+                                       data={**data, 'photo_data': photo_data})
             # Admin submitted → approve immediately
             ok, err = EditRequestService.approve(current_user, req.request_id,
                                                  notes='Auto-approved (admin direct edit)')
@@ -51,12 +69,14 @@ def inmate_edit(inmate_id):
         # Everyone else → queue for approval
         req, error = EditRequestService.submit_inmate_edit(
             actor=current_user, inmate_id=inmate_id,
-            form_data=data, reason=reason,
+            form_data=data, reason=reason, photo_path=photo_path,
         )
         if error:
+            PersonPhotoService.delete_photo(photo_path)
             flash(error, 'danger')
             return render_template('inmate/edit_form.html',
-                                   inmate=inmate, data=data)
+                                   inmate=inmate,
+                                   data={**data, 'photo_data': photo_data})
 
         flash(
             f'Edit request #{req.request_id} submitted. '
@@ -66,6 +86,90 @@ def inmate_edit(inmate_id):
         return redirect(url_for('inmate.detail', inmate_id=inmate_id))
 
     return render_template('inmate/edit_form.html', inmate=inmate, data={})
+
+
+# ---------- Requester: edit form for a visitor ----------
+@edit_bp.route('/visitor/<int:visitor_id>/edit', methods=['GET', 'POST'])
+@login_required
+@require_permission(Permissions.INMATE_EDIT_REQUEST)
+def visitor_edit(visitor_id):
+    visitor = Visitor.query.get(visitor_id)
+    if not visitor:
+        flash('Visitor not found.', 'danger')
+        return redirect(url_for('visitor.list_visitors'))
+
+    if request.method == 'POST':
+        data = request.form.to_dict()
+        reason = data.pop('request_reason', None)
+        photo_data = data.pop('photo_data', '')
+        data.pop('photo_path', None)
+        photo_path, photo_error = PersonPhotoService.save_capture(photo_data)
+        if photo_error:
+            flash(photo_error, 'danger')
+            return render_template(
+                'visitor/edit_request.html',
+                visitor=visitor,
+                data={**data, 'photo_data': photo_data},
+            )
+        edit_request, error = EditRequestService.submit_visitor_edit(
+            actor=current_user,
+            visitor_id=visitor_id,
+            form_data=data,
+            reason=reason,
+            photo_path=photo_path,
+        )
+        if error:
+            PersonPhotoService.delete_photo(photo_path)
+            flash(error, 'danger')
+            return render_template(
+                'visitor/edit_request.html',
+                visitor=visitor,
+                data={**data, 'photo_data': photo_data},
+            )
+
+        if has_permission(Permissions.INMATE_EDIT_APPROVE):
+            ok, error = EditRequestService.approve(
+                current_user,
+                edit_request.request_id,
+                notes='Auto-approved (administrator direct edit)',
+            )
+            if not ok:
+                flash(error, 'danger')
+            else:
+                flash(f'Changes applied to {visitor.full_name}.', 'success')
+            return redirect(url_for('visitor.detail', visitor_id=visitor_id))
+
+        flash(
+            f'Edit request #{edit_request.request_id} submitted. '
+            'Waiting for administrator approval.',
+            'info',
+        )
+        return redirect(url_for('visitor.detail', visitor_id=visitor_id))
+
+    return render_template('visitor/edit_request.html', visitor=visitor, data={})
+
+
+@edit_bp.route('/admin/edit-requests/<int:request_id>/photo')
+@login_required
+@require_permission(Permissions.INMATE_EDIT_APPROVE)
+def request_photo(request_id):
+    edit_request = EditRequest.query.get_or_404(request_id)
+    proposed_photo = edit_request.changes.get('photo_path', {}).get('new')
+    if not proposed_photo:
+        abort(404)
+
+    photo_directory = (Path(current_app.instance_path) / 'person_photos').resolve()
+    photo_path = (photo_directory / proposed_photo).resolve()
+    if photo_directory not in photo_path.parents or not photo_path.is_file():
+        abort(404)
+    response = send_from_directory(
+        str(photo_directory),
+        photo_path.name,
+        mimetype='image/jpeg',
+    )
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    response.headers['Cache-Control'] = 'private, no-store'
+    return response
 
 
 # ---------- Admin: list all requests ----------
@@ -96,12 +200,15 @@ def view_request(request_id):
         return redirect(url_for('edit_requests.list_requests'))
 
     inmate = None
+    visitor = None
     if req.target_type == 'Inmate':
         inmate = Inmate.query.get(req.target_id)
+    elif req.target_type == 'Visitor':
+        visitor = Visitor.query.get(req.target_id)
 
     return render_template(
         'admin/edit_request_detail.html',
-        req=req, inmate=inmate,
+        req=req, inmate=inmate, visitor=visitor,
     )
 
 

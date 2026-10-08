@@ -3,7 +3,7 @@
 
 {% block visitor_content %}
 <div class="d-flex justify-content-between align-items-center mb-3">
-    <h3 class="mb-0"><i class="bi bi-people"></i> Visitors</h3>
+    <h3 class="mb-0"><img class="visitor-icon visitor-icon--heading" src="{{ url_for('static', filename='images/visitor-icon.png') }}" alt=""> Visitors</h3>
     <div class="d-flex gap-2">
         {% if current_user.role_name in ['System Administrator', 'Warden'] %}
         <div class="btn-group">
