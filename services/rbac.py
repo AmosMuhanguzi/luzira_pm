@@ -107,6 +107,7 @@ ROLE_PERMISSIONS = {
         Permissions.VISIT_VIEW, Permissions.VISIT_CREATE,
         Permissions.AI_VIEW_DASHBOARD,
         Permissions.INMATE_EDIT_REQUEST,
+        Permissions.DISCIPLINARY_CREATE,
         Permissions.VISITOR_BLACKLIST,
     ],
     'Receptionist': [
@@ -118,6 +119,7 @@ ROLE_PERMISSIONS = {
         Permissions.VISIT_VIEW, Permissions.VISIT_CREATE,
         Permissions.AI_VIEW_DASHBOARD,
         Permissions.INMATE_EDIT_REQUEST,
+        Permissions.DISCIPLINARY_CREATE,
         Permissions.VISITOR_BLACKLIST,
     ],
     'Security Officer': [

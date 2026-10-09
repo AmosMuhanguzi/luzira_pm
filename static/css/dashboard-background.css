@@ -62,7 +62,7 @@
     background: rgba(235, 241, 244, .58);
 }
 
-.dashboard-background > :not(.dashboard-slideshow) {
+.dashboard-background > :not(.dashboard-slideshow):not(.site-navbar) {
     position: relative;
     z-index: 0;
 }

@@ -1,4 +1,10 @@
 /* static/css/style.css */
+html,
+body {
+    max-width: 100%;
+    overflow-x: clip;
+}
+
 body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }
@@ -13,6 +19,128 @@ body {
     gap: 0.45rem;
     font-weight: 600;
     letter-spacing: 0.5px;
+}
+
+.site-navbar {
+    position: fixed !important;
+    inset: 0 0 auto;
+    z-index: 1030;
+    width: 100%;
+    background-color: #800000;
+}
+
+.site-navbar .container-fluid {
+    min-width: 0;
+    max-width: 100%;
+}
+
+.site-navbar .navbar-brand {
+    flex: 0 0 auto;
+    color: #fffacd;
+    font-weight: 700;
+}
+
+.site-navbar .nav-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    color: #fffacd;
+    font-weight: 700;
+    line-height: 1.2;
+    white-space: normal;
+}
+
+.site-navbar .nav-link:hover,
+.site-navbar .nav-link:focus {
+    color: #f0e68c;
+}
+
+.site-navbar .navbar-toggler {
+    border-color: #f0e68c;
+}
+
+.site-navbar .navbar-toggler-icon {
+    filter: brightness(0) saturate(100%) invert(96%) sepia(15%) saturate(1100%) hue-rotate(2deg) brightness(105%);
+}
+
+.site-navbar .badge {
+    background-color: #f0e68c !important;
+    color: #800000;
+    font-weight: 700;
+}
+
+.site-navbar .dropdown-menu {
+    border-color: #800000;
+    background-color: #fffacd;
+}
+
+.site-navbar .dropdown-item {
+    color: #800000;
+    font-weight: 700;
+}
+
+.site-navbar .dropdown-item:hover,
+.site-navbar .dropdown-item:focus {
+    background-color: #f0e68c;
+}
+
+@media (min-width: 992px) {
+    .site-navbar .navbar-collapse {
+        display: flex !important;
+        flex: 1 1 auto;
+        min-width: 0;
+        align-items: center;
+    }
+
+    .site-navbar .navbar-nav.me-auto {
+        flex: 1 1 0;
+        min-width: 0;
+        flex-wrap: nowrap;
+        align-items: center;
+        justify-content: space-evenly;
+        margin-right: 0 !important;
+    }
+
+    .site-navbar .navbar-nav:not(.me-auto) {
+        flex: 0 1 10rem;
+        min-width: 0;
+    }
+
+    .site-navbar .nav-item {
+        flex: 1 1 0;
+        min-width: 0;
+    }
+
+    .site-navbar .nav-link {
+        display: flex;
+        width: 100%;
+        min-width: 0;
+        justify-content: center;
+        flex-wrap: wrap;
+        gap: 0.2rem;
+        padding: 0.35rem 0.15rem;
+        font-size: 0.8rem;
+        text-align: center;
+        overflow-wrap: anywhere;
+    }
+
+    .site-navbar #userMenu {
+        display: flex;
+        width: 100%;
+        max-width: 100%;
+        justify-content: center;
+        flex-wrap: wrap;
+        gap: 0.15rem;
+        padding: 0.35rem 0.15rem;
+        font-size: 0.75rem;
+        text-align: center;
+        overflow-wrap: anywhere;
+    }
+
+    .site-navbar #userMenu .badge {
+        max-width: 100%;
+        white-space: normal;
+    }
 }
 
 .navbar-brand-logo {
