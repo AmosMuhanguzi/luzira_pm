@@ -32,7 +32,7 @@
 <form method="POST" enctype="multipart/form-data" novalidate>
     {% include 'person_photo_capture.html' %}
     <div class="card shadow-sm border-0 mb-3">
-        <div class="card-header bg-dark text-white"><i class="bi bi-person"></i> Personal</div>
+        <div class="card-header bg-dark text-white"><i class="bi bi-person"></i> Personal Info</div>
         <div class="card-body">
             <div class="row g-3">
                 <div class="col-md-6">
@@ -42,8 +42,15 @@
                 </div>
                 <div class="col-md-3">
                     <label class="form-label">Date of birth *</label>
-                    <input type="date" name="date_of_birth" class="form-control" required
+                    <input type="date" id="dobInput" name="date_of_birth" class="form-control" required
                            value="{{ data.date_of_birth or (inmate.date_of_birth if editing else '') }}">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Age</label>
+                    <input type="text" id="ageDisplay" class="form-control" readonly tabindex="-1"
+                           placeholder="Auto from date of birth"
+                           value="{{ inmate.age if editing and inmate and inmate.age is not none else '' }}">
+                    <div class="form-text">Calculated automatically.</div>
                 </div>
                 <div class="col-md-3">
                     <label class="form-label">Gender *</label>
@@ -61,7 +68,7 @@
                            value="{{ data.nationality or (inmate.nationality if editing else 'Ugandan') }}">
                 </div>
                 <div class="col-md-3">
-                    <label class="form-label">National ID №</label>
+                    <label class="form-label">National ID No</label>
                     <input type="text" name="national_id_number" class="form-control"
                            value="{{ data.national_id_number or (inmate.national_id_number if editing else '') }}">
                 </div>
@@ -75,6 +82,37 @@
                     <input type="text" name="religion" class="form-control"
                            value="{{ data.religion or (inmate.religion if editing else '') }}">
                 </div>
+                <div class="col-md-3">
+                    <label class="form-label">Education</label>
+                    <select name="education" class="form-select">
+                        <option value="">--</option>
+                        {% for e in ['None','Primary','Secondary (O-Level)','Secondary (A-Level)','Certificate','Diploma','Degree','Postgraduate','Masters Degree','PhD','Other'] %}
+                        <option value="{{ e }}"
+                            {{ 'selected' if (data.education or (inmate.education if editing else '')) == e }}>{{ e }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Arrested from</label>
+                    <input type="text" name="arrested_from" class="form-control"
+                           placeholder="Place / district of arrest"
+                           value="{{ data.arrested_from or (inmate.arrested_from if editing else '') }}">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Height (cm)</label>
+                    <input type="number" name="height_cm" class="form-control" min="0"
+                           value="{{ data.height_cm or (inmate.height_cm if editing else '') }}">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Weight (kg)</label>
+                    <input type="number" name="weight_kg" class="form-control" min="0"
+                           value="{{ data.weight_kg or (inmate.weight_kg if editing else '') }}">
+                </div>
+                <div class="col-12">
+                    <label class="form-label">Overall description</label>
+                    <textarea name="overall_description" class="form-control" rows="2"
+                              placeholder="Build, complexion, scars, marks and other general description">{{ data.overall_description or (inmate.overall_description if editing else '') }}</textarea>
+                </div>
             </div>
         </div>
     </div>
@@ -83,27 +121,45 @@
         <div class="card-header bg-dark text-white"><i class="bi bi-telephone"></i> Next of Kin</div>
         <div class="card-body">
             <div class="row g-3">
-                <div class="col-md-4">
+                <div class="col-md-6">
                     <label class="form-label">Name</label>
                     <input type="text" name="next_of_kin_name" class="form-control"
                            value="{{ data.next_of_kin_name or (inmate.next_of_kin_name if editing else '') }}">
                 </div>
-                <div class="col-md-3">
-                    <label class="form-label">Relationship</label>
+                <div class="col-md-6">
+                    <label class="form-label">Relationship to
+                        {% if editing and inmate %}
+                        <a href="{{ url_for('inmate.detail', inmate_id=inmate.inmate_id) }}" target="_blank" rel="noopener"
+                           class="fw-semibold" style="color:#800000">{{ inmate.inmate_number }}</a>
+                        {% else %}
+                        <span class="fw-semibold" style="color:#800000">the inmate (ID assigned on save)</span>
+                        {% endif %}
+                    </label>
                     <input type="text" name="next_of_kin_relationship" class="form-control"
+                           placeholder="e.g. Mother, Brother, Spouse"
                            value="{{ data.next_of_kin_relationship or (inmate.next_of_kin_relationship if editing else '') }}">
                 </div>
-                <div class="col-md-5">
-                    <label class="form-label">Phone</label>
-                    <input type="text" name="next_of_kin_phone" class="form-control"
+                <div class="col-md-3">
+                    <label class="form-label">Contact 1</label>
+                    <input type="tel" name="next_of_kin_phone" class="form-control"
                            value="{{ data.next_of_kin_phone or (inmate.next_of_kin_phone if editing else '') }}">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Contact 2 <span class="text-muted small">(optional)</span></label>
+                    <input type="tel" name="next_of_kin_phone_2" class="form-control"
+                           value="{{ data.next_of_kin_phone_2 or (inmate.next_of_kin_phone_2 if editing else '') }}">
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Address / Location</label>
+                    <input type="text" name="next_of_kin_address" class="form-control"
+                           value="{{ data.next_of_kin_address or (inmate.next_of_kin_address if editing else '') }}">
                 </div>
             </div>
         </div>
     </div>
 
     <div class="card shadow-sm border-0 mb-3">
-        <div class="card-header bg-dark text-white"><i class="bi bi-bank"></i> Legal</div>
+        <div class="card-header bg-dark text-white"><i class="bi bi-bank"></i> Legal Info</div>
         <div class="card-body">
             <div class="row g-3">
                 <div class="col-md-4">
@@ -118,37 +174,49 @@
                     </select>
                 </div>
                 <div class="col-md-4">
-                    <label class="form-label">Court case №</label>
+                    <label class="form-label">Court case No</label>
                     <input type="text" name="court_case_number" class="form-control"
                            value="{{ data.court_case_number or (inmate.court_case_number if editing else '') }}">
                 </div>
                 <div class="col-md-4">
-                    <label class="form-label">Sentence type</label>
-                    <input type="text" name="sentence_type" class="form-control"
-                           placeholder="e.g. Remand, 5 years"
-                           value="{{ data.sentence_type or (inmate.sentence_type if editing else '') }}">
+                    <label class="form-label">Offence *</label>
+                    {% set offence = data.sentence_type or (inmate.offence_status if editing else '') %}
+                    <select id="offenceStatus" name="sentence_type" class="form-select" required>
+                        <option value="">-- select --</option>
+                        {% for o in ['Remand','Convict'] %}
+                        <option value="{{ o }}" {{ 'selected' if offence == o }}>{{ o }}</option>
+                        {% endfor %}
+                    </select>
                 </div>
                 <div class="col-md-8">
                     <label class="form-label">Crime description</label>
                     <textarea name="crime_description" class="form-control" rows="2">{{ data.crime_description or (inmate.crime_description if editing else '') }}</textarea>
                 </div>
-                <div class="col-md-4">
+                <div class="col-md-4 convict-only d-none">
                     <label class="form-label">Sentence</label>
                     <div class="input-group">
+                        {% set sp = inmate.sentence_parts if editing else ('', 'year') %}
                         <input type="number" id="sentenceValue" name="sentence_value" class="form-control"
-                               min="0.5" step="0.5" placeholder="e.g. 1">
+                               min="0.5" step="0.5" placeholder="e.g. 1"
+                               value="{{ data.sentence_value or sp[0] }}">
                         <select id="sentenceUnit" name="sentence_unit" class="form-select">
-                            <option value="year">Year(s)</option>
-                            <option value="month">Month(s)</option>
+                            {% set su = data.sentence_unit or sp[1] %}
+                            <option value="year" {{ 'selected' if su == 'year' }}>Year(s)</option>
+                            <option value="month" {{ 'selected' if su == 'month' }}>Month(s)</option>
                         </select>
                     </div>
                     <div class="form-text">1 year = 360 days, 1 month = 30 days</div>
                 </div>
-                <div class="col-md-4">
+                <div class="col-md-4 convict-only d-none">
                     <label class="form-label">Expected release date</label>
                     <input type="date" id="expectedRelease" name="expected_release_date" class="form-control" readonly
                            value="{{ data.expected_release_date or (inmate.expected_release_date if editing else '') }}">
                     <div id="expectedReleaseNote" class="form-text">Calculated automatically (sentence less 1/10).</div>
+                </div>
+                <div class="col-md-4 remand-only d-none">
+                    <label class="form-label">Next date to court *</label>
+                    <input type="date" id="nextCourtDate" name="next_court_date" class="form-control"
+                           value="{{ data.next_court_date or (inmate.next_court_date if editing else '') }}">
                 </div>
             </div>
         </div>
@@ -200,11 +268,6 @@
                             {{ 'selected' if (data.security_classification or (inmate.security_classification if editing else 'Medium')) == s }}>{{ s }}</option>
                         {% endfor %}
                     </select>
-                </div>
-                <div class="col-md-3">
-                    <label class="form-label">Height (cm)</label>
-                    <input type="number" name="height_cm" class="form-control"
-                           value="{{ data.height_cm or (inmate.height_cm if editing else '') }}">
                 </div>
             </div>
         </div>
@@ -258,6 +321,21 @@
 
 <script>
 (function () {
+    const dob = document.getElementById('dobInput');
+    const out = document.getElementById('ageDisplay');
+    function showAge() {
+        if (!dob.value) { out.value = ''; return; }
+        const b = new Date(dob.value), t = new Date();
+        let age = t.getFullYear() - b.getFullYear();
+        if (t.getMonth() < b.getMonth() || (t.getMonth() === b.getMonth() && t.getDate() < b.getDate())) age--;
+        out.value = age >= 0 ? age : '';
+    }
+    dob.addEventListener('input', showAge);
+    showAge();
+})();
+</script>
+<script>
+(function () {
     const value = document.getElementById('sentenceValue');
     const unit = document.getElementById('sentenceUnit');
     const out = document.getElementById('expectedRelease');
@@ -276,6 +354,23 @@
     }
     value.addEventListener('input', recalc);
     unit.addEventListener('change', recalc);
+
+    const status = document.getElementById('offenceStatus');
+    function toggleOffence() {
+        const convict = status.value === 'Convict';
+        const remand = status.value === 'Remand';
+        document.querySelectorAll('.convict-only').forEach(el => {
+            el.classList.toggle('d-none', !convict);
+            el.querySelectorAll('input,select').forEach(i => i.disabled = !convict);
+        });
+        document.querySelectorAll('.remand-only').forEach(el => {
+            el.classList.toggle('d-none', !remand);
+            el.querySelectorAll('input').forEach(i => { i.disabled = !remand; i.required = remand; });
+        });
+        if (convict) recalc();
+    }
+    status.addEventListener('change', toggleOffence);
+    toggleOffence();
 })();
 </script>
 <script>

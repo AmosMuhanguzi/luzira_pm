@@ -27,6 +27,7 @@ class Inmate(BaseModel):
     next_of_kin_name         = db.Column(db.String(150))
     next_of_kin_relationship = db.Column(db.String(50))
     next_of_kin_phone        = db.Column(db.String(20))
+    next_of_kin_phone_2      = db.Column(db.String(20))
     next_of_kin_address      = db.Column(db.Text)
 
     # ---- Physical ----
@@ -36,7 +37,11 @@ class Inmate(BaseModel):
     hair_color           = db.Column(db.String(20))
     distinguishing_marks = db.Column(db.Text)
     photo_path           = db.Column(db.String(255))
+    overall_description  = db.Column(db.Text)
 
+    # ---- Background ----
+    education            = db.Column(db.String(100))
+    arrested_from        = db.Column(db.String(150))
     # ---- Legal ----
     crime_category        = db.Column(db.String(100), index=True)
     crime_description     = db.Column(db.Text)
@@ -47,6 +52,7 @@ class Inmate(BaseModel):
     sentence_duration     = db.Column(db.String(50))
     sentence_start_date   = db.Column(db.Date)
     expected_release_date = db.Column(db.Date, index=True)
+    next_court_date       = db.Column(db.Date)
     actual_release_date   = db.Column(db.Date)
 
     # ---- Death record ----
@@ -121,6 +127,24 @@ class Inmate(BaseModel):
         next_id = (last_entry.inmate_id + 1) if last_entry else 1
         return f"LZR-{year}-{next_id:06d}"
 
+    @property
+    def age(self):
+        if not self.date_of_birth:
+            return None
+        today = date.today()
+        dob = self.date_of_birth
+        return today.year - dob.year - ((today.month, today.day) < (dob.month, dob.day))
+
+    @property
+    def offence_status(self):
+        from services.sentence import offence_status
+        return offence_status(self.sentence_type, self.sentence_duration)
+
+    @property
+    def sentence_parts(self):
+        from services.sentence import split_sentence
+        return split_sentence(self.sentence_duration)
+
     def current_episode(self):
         return self.admission_episodes.filter_by(is_current=True).first()
 
@@ -141,9 +165,14 @@ class Inmate(BaseModel):
             'next_of_kin_name': self.next_of_kin_name,
             'next_of_kin_relationship': self.next_of_kin_relationship,
             'next_of_kin_phone': self.next_of_kin_phone,
+            'next_of_kin_phone_2': self.next_of_kin_phone_2,
             'next_of_kin_address': self.next_of_kin_address,
             'height_cm': self.height_cm,
             'weight_kg': self.weight_kg,
+            'education': self.education,
+            'arrested_from': self.arrested_from,
+            'overall_description': self.overall_description,
+            'age': self.age,
             'eye_color': self.eye_color,
             'hair_color': self.hair_color,
             'distinguishing_marks': self.distinguishing_marks,

@@ -10,6 +10,7 @@ from models.inmate import Inmate
 from models.visitor import Visitor
 from models.audit import AuditEvent
 from services.inmate_service import InmateService
+from services.sentence import parse_sentence, sentence_label, expected_release
 
 
 # Fields that can be edited and their type (for coercion on apply)
@@ -17,12 +18,14 @@ INMATE_EDITABLE_FIELDS = {
     'full_name': str, 'date_of_birth': 'date', 'gender': str, 'nationality': str,
     'tribe': str, 'religion': str, 'national_id_number': str,
     'next_of_kin_name': str, 'next_of_kin_relationship': str,
-    'next_of_kin_phone': str, 'next_of_kin_address': str,
+    'next_of_kin_phone': str, 'next_of_kin_phone_2': str, 'next_of_kin_address': str,
     'height_cm': int, 'weight_kg': int,
+    'education': str, 'arrested_from': str, 'overall_description': str,
     'crime_category': str, 'crime_description': str,
     'court_case_number': str, 'sentencing_court': str, 'judge_name': str,
     'sentence_type': str, 'sentence_duration': str,
     'sentence_start_date': 'date', 'expected_release_date': 'date',
+    'next_court_date': 'date',
     'cell_block': str, 'cell_number': str, 'security_classification': str,
     'has_medical_condition': bool, 'medical_alert': str,
     'risk_level': str,
@@ -57,6 +60,10 @@ class EditRequestService:
         inmate = Inmate.query.get(inmate_id)
         if not inmate:
             return None, 'Inmate not found.'
+
+        form_data, legal_error = _resolve_legal_fields(inmate, form_data)
+        if legal_error:
+            return None, legal_error
 
         changes = {}
         for field, ftype in INMATE_EDITABLE_FIELDS.items():
@@ -299,6 +306,38 @@ class EditRequestService:
 
 
 # ---------- helpers ----------
+def _resolve_legal_fields(inmate, form_data):
+    """Apply the Remand/Convict rules (same as intake) to an edit submission."""
+    status = (form_data.get('sentence_type') or '').strip()
+    if not status:
+        return form_data, None
+    error = InmateService.validate_legal_status(form_data)
+    if error:
+        return form_data, error
+    data = dict(form_data)
+    if status == 'Remand':
+        data.update(sentence_duration='', sentence_start_date='', expected_release_date='')
+        return data, None
+
+    data['next_court_date'] = ''
+    parsed = parse_sentence(data.get('sentence_value'), data.get('sentence_unit'))
+    number, unit = parsed
+    unchanged = (
+        inmate.offence_status == 'Convict'
+        and inmate.expected_release_date
+        and inmate.sentence_parts == (f'{number:g}', unit)
+    )
+    if unchanged:
+        for key in ('sentence_duration', 'sentence_start_date', 'expected_release_date'):
+            data.pop(key, None)
+        return data, None
+    start = date.today()
+    data['sentence_duration'] = sentence_label(number, unit)
+    data['sentence_start_date'] = start.isoformat()
+    data['expected_release_date'] = expected_release(start, number, unit)['release_date'].isoformat()
+    return data, None
+
+
 def _coerce(value, ftype):
     if value is None:
         return None

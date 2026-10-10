@@ -81,6 +81,29 @@
                     <input type="text" name="religion" class="form-control"
                            value="{{ data.religion or inmate.religion or '' }}">
                 </div>
+                <div class="col-md-3">
+                    <label class="form-label">Education</label>
+                    <select name="education" class="form-select">
+                        <option value="">--</option>
+                        {% for e in ['None','Primary','Secondary (O-Level)','Secondary (A-Level)','Certificate','Diploma','Degree','Postgraduate','Other'] %}
+                        <option value="{{ e }}" {{ 'selected' if (data.education or inmate.education) == e }}>{{ e }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Arrested from</label>
+                    <input type="text" name="arrested_from" class="form-control"
+                           value="{{ data.arrested_from or inmate.arrested_from or '' }}">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Weight (kg)</label>
+                    <input type="number" name="weight_kg" class="form-control" min="0"
+                           value="{{ data.weight_kg or inmate.weight_kg or '' }}">
+                </div>
+                <div class="col-12">
+                    <label class="form-label">Overall description</label>
+                    <textarea name="overall_description" class="form-control" rows="2">{{ data.overall_description or inmate.overall_description or '' }}</textarea>
+                </div>
             </div>
         </div>
     </div>
@@ -99,10 +122,20 @@
                     <input type="text" name="next_of_kin_relationship" class="form-control"
                            value="{{ data.next_of_kin_relationship or inmate.next_of_kin_relationship or '' }}">
                 </div>
-                <div class="col-md-5">
-                    <label class="form-label">Phone</label>
-                    <input type="text" name="next_of_kin_phone" class="form-control"
+                <div class="col-md-3">
+                    <label class="form-label">Contact 1</label>
+                    <input type="tel" name="next_of_kin_phone" class="form-control"
                            value="{{ data.next_of_kin_phone or inmate.next_of_kin_phone or '' }}">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Contact 2 <span class="text-muted small">(optional)</span></label>
+                    <input type="tel" name="next_of_kin_phone_2" class="form-control"
+                           value="{{ data.next_of_kin_phone_2 or inmate.next_of_kin_phone_2 or '' }}">
+                </div>
+                <div class="col-md-12">
+                    <label class="form-label">Address / Location</label>
+                    <input type="text" name="next_of_kin_address" class="form-control"
+                           value="{{ data.next_of_kin_address or inmate.next_of_kin_address or '' }}">
                 </div>
             </div>
         </div>
@@ -129,18 +162,44 @@
                            value="{{ data.court_case_number or inmate.court_case_number or '' }}">
                 </div>
                 <div class="col-md-4">
-                    <label class="form-label">Sentence type</label>
-                    <input type="text" name="sentence_type" class="form-control"
-                           value="{{ data.sentence_type or inmate.sentence_type or '' }}">
+                    <label class="form-label">Offence *</label>
+                    {% set offence = data.sentence_type or inmate.offence_status %}
+                    <select id="offenceStatus" name="sentence_type" class="form-select" required>
+                        <option value="">-- select --</option>
+                        {% for o in ['Remand','Convict'] %}
+                        <option value="{{ o }}" {{ 'selected' if offence == o }}>{{ o }}</option>
+                        {% endfor %}
+                    </select>
                 </div>
                 <div class="col-md-8">
                     <label class="form-label">Crime description</label>
                     <textarea name="crime_description" class="form-control" rows="2">{{ data.crime_description or inmate.crime_description or '' }}</textarea>
                 </div>
-                <div class="col-md-4">
+                <div class="col-md-4 convict-only d-none">
+                    <label class="form-label">Sentence</label>
+                    {% set sp = inmate.sentence_parts %}
+                    {% set su = data.sentence_unit or sp[1] %}
+                    <div class="input-group">
+                        <input type="number" id="sentenceValue" name="sentence_value" class="form-control"
+                               min="0.5" step="0.5" placeholder="e.g. 1"
+                               value="{{ data.sentence_value or sp[0] }}">
+                        <select id="sentenceUnit" name="sentence_unit" class="form-select">
+                            <option value="year" {{ 'selected' if su == 'year' }}>Year(s)</option>
+                            <option value="month" {{ 'selected' if su == 'month' }}>Month(s)</option>
+                        </select>
+                    </div>
+                    <div class="form-text">1 year = 360 days, 1 month = 30 days</div>
+                </div>
+                <div class="col-md-4 convict-only d-none">
                     <label class="form-label">Expected release date</label>
-                    <input type="date" name="expected_release_date" class="form-control"
-                           value="{{ data.expected_release_date or inmate.expected_release_date or '' }}">
+                    <input type="date" id="expectedRelease" class="form-control" readonly
+                           value="{{ inmate.expected_release_date or '' }}">
+                    <div id="expectedReleaseNote" class="form-text">Recalculated automatically if the sentence changes.</div>
+                </div>
+                <div class="col-md-4 remand-only d-none">
+                    <label class="form-label">Next date to court *</label>
+                    <input type="date" id="nextCourtDate" name="next_court_date" class="form-control"
+                           value="{{ data.next_court_date or inmate.next_court_date or '' }}">
                 </div>
             </div>
         </div>
@@ -152,8 +211,21 @@
             <div class="row g-3">
                 <div class="col-md-3">
                     <label class="form-label">Cell block</label>
-                    <input type="text" name="cell_block" class="form-control"
-                           value="{{ data.cell_block or inmate.cell_block or '' }}">
+                    {% set current_block = data.cell_block or inmate.cell_block or '' %}
+                    <select id="cellBlock" name="cell_block" class="form-select">
+                        <option value="">-- unassigned --</option>
+                        {% for cell in cell_blocks %}
+                        {% if cell.available or cell.name == current_block %}
+                        <option value="{{ cell.name }}" {{ 'selected' if cell.name == current_block }}>
+                            {{ cell.name }} ({{ cell.occupancy }}/{{ cell.capacity }})
+                        </option>
+                        {% endif %}
+                        {% endfor %}
+                        {% if current_block and current_block not in cell_blocks|map(attribute='name') %}
+                        <option value="{{ current_block }}" selected>{{ current_block }} (not in cell list)</option>
+                        {% endif %}
+                    </select>
+                    <div id="cellAssignmentStatus" class="form-text">Only blocks matching the security class are listed.</div>
                 </div>
                 <div class="col-md-3">
                     <label class="form-label">Cell number</label>
@@ -209,4 +281,56 @@
     </div>
 </form>
 <script src="{{ url_for('static', filename='js/person-photo-capture.js') }}"></script>
+<script>
+(function () {
+    const value = document.getElementById('sentenceValue');
+    const unit = document.getElementById('sentenceUnit');
+    const out = document.getElementById('expectedRelease');
+    const note = document.getElementById('expectedReleaseNote');
+    function recalc() {
+        const n = parseFloat(value.value);
+        if (!(n > 0)) { out.value = ''; return; }
+        const total = n * (unit.value === 'year' ? 360 : 30);
+        const remission = Math.round(total / 10);
+        const served = Math.round(total) - remission;
+        const d = new Date();
+        d.setDate(d.getDate() + served);
+        const pad = x => String(x).padStart(2, '0');
+        out.value = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+        note.textContent = `${Math.round(total)} − (1/10 × ${Math.round(total)} = ${remission}) = ${served} days → ${d.toLocaleString('en-GB', {month: 'long', year: 'numeric'})}`;
+    }
+    value.addEventListener('input', recalc);
+    unit.addEventListener('change', recalc);
+
+    const status = document.getElementById('offenceStatus');
+    function toggleOffence() {
+        const convict = status.value === 'Convict';
+        const remand = status.value === 'Remand';
+        document.querySelectorAll('.convict-only').forEach(el => {
+            el.classList.toggle('d-none', !convict);
+            el.querySelectorAll('input,select').forEach(i => i.disabled = !convict);
+        });
+        document.querySelectorAll('.remand-only').forEach(el => {
+            el.classList.toggle('d-none', !remand);
+            el.querySelectorAll('input').forEach(i => { i.disabled = !remand; i.required = remand; });
+        });
+        if (convict && !out.value) recalc();
+    }
+    status.addEventListener('change', () => { toggleOffence(); if (status.value === 'Convict') recalc(); });
+    toggleOffence();
+
+    const cellBlocks = {{ cell_blocks|tojson }};
+    const cls = document.querySelector('[name="security_classification"]');
+    const cell = document.getElementById('cellBlock');
+    function filterCells() {
+        Array.from(cell.options).forEach(o => {
+            if (!o.value) return;
+            const b = cellBlocks.find(x => x.name === o.value);
+            o.hidden = !!b && b.security_classification !== cls.value;
+        });
+        if (cell.selectedOptions[0]?.hidden) cell.value = '';
+    }
+    cls.addEventListener('change', filterCells);
+})();
+</script>
 {% endblock %}

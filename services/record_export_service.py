@@ -29,6 +29,7 @@ INMATE_EXPORT_FIELDS = (
     ('Next of kin name', 'next_of_kin_name'),
     ('Next of kin relationship', 'next_of_kin_relationship'),
     ('Next of kin phone', 'next_of_kin_phone'),
+    ('Next of kin phone 2', 'next_of_kin_phone_2'),
     ('Next of kin address', 'next_of_kin_address'),
     ('Height (cm)', 'height_cm'),
     ('Weight (kg)', 'weight_kg'),

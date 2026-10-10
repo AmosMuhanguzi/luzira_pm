@@ -20,6 +20,34 @@ def sentence_label(number, unit):
     return f"{text} {unit}{'' if number == 1 else 's'}"
 
 
+def offence_status(sentence_type, sentence_duration):
+    """Map new and legacy values to 'Remand', 'Convict' or ''."""
+    kind = (sentence_type or '').strip().lower()
+    if kind in ('remand', 'convict'):
+        return kind.title()
+    duration = (sentence_duration or '').strip().lower()
+    if 'remand' in duration:
+        return 'Remand'
+    if split_sentence(duration)[0]:
+        return 'Convict'
+    return ''
+
+
+def split_sentence(duration):
+    """Split '2 years' (or a legacy bare number of months) into (value, unit)."""
+    parts = (duration or '').strip().lower().split()
+    if not parts:
+        return '', 'year'
+    try:
+        number = float(parts[0])
+    except ValueError:
+        return '', 'year'
+    if number <= 0:
+        return '', 'year'
+    unit = parts[1].rstrip('s') if len(parts) > 1 else 'month'
+    return f'{number:g}', unit if unit in DAYS_PER_UNIT else 'month'
+
+
 def expected_release(start_date, number, unit):
     """Sentence in days (1 month = 30, 1 year = 360) minus one tenth remission."""
     total_days = number * DAYS_PER_UNIT[unit]

@@ -48,7 +48,8 @@
     <div class="row g-3 mb-4">
         <div class="col-md-6"><strong>Name:</strong> {{ inmate.next_of_kin_name or '—' }}</div>
         <div class="col-md-6"><strong>Relationship:</strong> {{ inmate.next_of_kin_relationship or '—' }}</div>
-        <div class="col-md-6"><strong>Phone:</strong> {{ inmate.next_of_kin_phone or '—' }}</div>
+        <div class="col-md-6"><strong>Contact 1:</strong> {{ inmate.next_of_kin_phone or '—' }}</div>
+        <div class="col-md-6"><strong>Contact 2:</strong> {{ inmate.next_of_kin_phone_2 or '—' }}</div>
         <div class="col-12"><strong>Address:</strong><br>{{ inmate.next_of_kin_address or '—' }}</div>
     </div>
 

@@ -137,7 +137,30 @@ class InmateService:
         return Inmate.query.get(inmate_id)
 
     @staticmethod
+    def validate_legal_status(data):
+        status = (data.get('sentence_type') or '').strip()
+        if status == 'Remand':
+            try:
+                datetime.strptime(data.get('next_court_date') or '', '%Y-%m-%d')
+            except ValueError:
+                return 'Enter the next date to court for a remand inmate.'
+        elif status == 'Convict':
+            if not parse_sentence(data.get('sentence_value'), data.get('sentence_unit')):
+                return 'Enter the sentence for a convicted inmate.'
+        return None
+
+    @staticmethod
     def _apply_sentence(inmate, data):
+        status = (data.get('sentence_type') or '').strip()
+        if status == 'Remand':
+            inmate.next_court_date = datetime.strptime(data['next_court_date'], '%Y-%m-%d').date()
+            inmate.sentence_duration = None
+            inmate.sentence_start_date = None
+            inmate.expected_release_date = None
+            return
+        if status != 'Convict':
+            return
+        inmate.next_court_date = None
         parsed = parse_sentence(data.get('sentence_value'), data.get('sentence_unit'))
         if not parsed:
             return
@@ -170,6 +193,10 @@ class InmateService:
         except (ValueError, TypeError):
             return None, 'Date of birth is not a valid date.'
 
+        legal_error = InmateService.validate_legal_status(data)
+        if legal_error:
+            return None, legal_error
+
         security_classification = data.get('security_classification') or 'Medium'
         cell_error = InmateService.validate_cell_assignment(
             data.get('cell_block'), security_classification
@@ -189,10 +216,14 @@ class InmateService:
             next_of_kin_name=data.get('next_of_kin_name'),
             next_of_kin_relationship=data.get('next_of_kin_relationship'),
             next_of_kin_phone=data.get('next_of_kin_phone'),
+            next_of_kin_phone_2=data.get('next_of_kin_phone_2'),
             next_of_kin_address=data.get('next_of_kin_address'),
             photo_path=data.get('photo_path'),
             height_cm=_to_int(data.get('height_cm')),
             weight_kg=_to_int(data.get('weight_kg')),
+            overall_description=data.get('overall_description'),
+            education=data.get('education'),
+            arrested_from=data.get('arrested_from'),
             crime_category=data.get('crime_category'),
             crime_description=data.get('crime_description'),
             court_case_number=data.get('court_case_number'),
@@ -263,7 +294,10 @@ class InmateService:
         if not inmate:
             return None, 'Inmate not found.'
 
-        enrolled_template = None
+        legal_error = InmateService.validate_legal_status(data)
+        if legal_error:
+            return None, legal_error
+
         if fingerprint_template:
             try:
                 enrolled_template = _to_bytes(fingerprint_template)
@@ -292,8 +326,10 @@ class InmateService:
         editable = [
             'crime_category', 'crime_description', 'court_case_number',
             'sentence_type', 'sentence_duration', 'cell_number',
+            'education', 'arrested_from', 'overall_description',
+            'tribe', 'religion',
             'security_classification', 'next_of_kin_name',
-            'next_of_kin_relationship', 'next_of_kin_phone',
+            'next_of_kin_relationship', 'next_of_kin_phone', 'next_of_kin_phone_2',
             'next_of_kin_address', 'medical_alert', 'photo_path',
         ]
         changes = []

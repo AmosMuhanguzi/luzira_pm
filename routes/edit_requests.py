@@ -1,4 +1,4 @@
-# routes/edit_requests.py
+﻿# routes/edit_requests.py
 from pathlib import Path
 
 from flask import (
@@ -42,6 +42,7 @@ def inmate_edit(inmate_id):
             return render_template(
                 'inmate/edit_form.html',
                 inmate=inmate,
+                cell_blocks=InmateService.cell_block_options(exclude_inmate_id=inmate_id),
                 data={**data, 'photo_data': photo_data},
             )
 
@@ -56,6 +57,7 @@ def inmate_edit(inmate_id):
                 flash(error, 'danger')
                 return render_template('inmate/edit_form.html',
                                        inmate=inmate,
+                                       cell_blocks=InmateService.cell_block_options(exclude_inmate_id=inmate_id),
                                        data={**data, 'photo_data': photo_data})
             # Admin submitted → approve immediately
             ok, err = EditRequestService.approve(current_user, req.request_id,
@@ -76,6 +78,7 @@ def inmate_edit(inmate_id):
             flash(error, 'danger')
             return render_template('inmate/edit_form.html',
                                    inmate=inmate,
+                                   cell_blocks=InmateService.cell_block_options(exclude_inmate_id=inmate_id),
                                    data={**data, 'photo_data': photo_data})
 
         flash(
@@ -85,7 +88,8 @@ def inmate_edit(inmate_id):
         )
         return redirect(url_for('inmate.detail', inmate_id=inmate_id))
 
-    return render_template('inmate/edit_form.html', inmate=inmate, data={})
+    return render_template('inmate/edit_form.html', inmate=inmate, data={},
+                           cell_blocks=InmateService.cell_block_options(exclude_inmate_id=inmate_id))
 
 
 # ---------- Requester: edit form for a visitor ----------

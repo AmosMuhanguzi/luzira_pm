@@ -55,14 +55,36 @@
             <div class="card-body">
                 <dl class="row mb-0">
                     <dt class="col-sm-4">Date of birth</dt><dd class="col-sm-8">{{ inmate.date_of_birth }}</dd>
+                    <dt class="col-sm-4">Age</dt><dd class="col-sm-8">{{ (inmate.age ~ ' years') if inmate.age is not none else '—' }}</dd>
                     <dt class="col-sm-4">Gender</dt><dd class="col-sm-8">{{ inmate.gender }}</dd>
                     <dt class="col-sm-4">Nationality</dt><dd class="col-sm-8">{{ inmate.nationality }}</dd>
+                    <dt class="col-sm-4">Tribe</dt><dd class="col-sm-8">{{ inmate.tribe or '—' }}</dd>
+                    <dt class="col-sm-4">Religion</dt><dd class="col-sm-8">{{ inmate.religion or '—' }}</dd>
+                    <dt class="col-sm-4">Education</dt><dd class="col-sm-8">{{ inmate.education or '—' }}</dd>
+                    <dt class="col-sm-4">Height</dt><dd class="col-sm-8">{{ (inmate.height_cm ~ ' cm') if inmate.height_cm else '—' }}</dd>
+                    <dt class="col-sm-4">Weight</dt><dd class="col-sm-8">{{ (inmate.weight_kg ~ ' kg') if inmate.weight_kg else '—' }}</dd>
+                    <dt class="col-sm-4">Arrested from</dt><dd class="col-sm-8">{{ inmate.arrested_from or '—' }}</dd>
+                    <dt class="col-sm-4">Description</dt><dd class="col-sm-8">{{ inmate.overall_description or '—' }}</dd>
                     <dt class="col-sm-4">National ID</dt><dd class="col-sm-8">{{ inmate.national_id_number or '—' }}</dd>
-                    <dt class="col-sm-4">Next of kin</dt>
+                </dl>
+            </div>
+        </div>
+
+        <div class="card shadow-sm border-0 mb-3">
+            <div class="card-header bg-dark text-white">Next of Kin</div>
+            <div class="card-body">
+                <dl class="row mb-0">
+                    <dt class="col-sm-4">Name</dt><dd class="col-sm-8">{{ inmate.next_of_kin_name or '—' }}</dd>
+                    <dt class="col-sm-4">Relationship to
+                        <a href="{{ url_for('inmate.detail', inmate_id=inmate.inmate_id) }}" style="color:#800000">{{ inmate.inmate_number }}</a></dt>
+                    <dd class="col-sm-8">{{ inmate.next_of_kin_relationship or '—' }}</dd>
+                    <dt class="col-sm-4">Contacts</dt>
                     <dd class="col-sm-8">
-                        {{ inmate.next_of_kin_name or '—' }}
-                        {% if inmate.next_of_kin_phone %}· {{ inmate.next_of_kin_phone }}{% endif %}
+                        {% if inmate.next_of_kin_phone or inmate.next_of_kin_phone_2 %}
+                            {{ [inmate.next_of_kin_phone, inmate.next_of_kin_phone_2]|select|join(' / ') }}
+                        {% else %}—{% endif %}
                     </dd>
+                    <dt class="col-sm-4">Address / Location</dt><dd class="col-sm-8">{{ inmate.next_of_kin_address or '—' }}</dd>
                 </dl>
             </div>
         </div>
@@ -74,8 +96,13 @@
                     <dt class="col-sm-4">Crime</dt><dd class="col-sm-8">{{ inmate.crime_category or '—' }}</dd>
                     <dt class="col-sm-4">Description</dt><dd class="col-sm-8">{{ inmate.crime_description or '—' }}</dd>
                     <dt class="col-sm-4">Court case №</dt><dd class="col-sm-8">{{ inmate.court_case_number or '—' }}</dd>
-                    <dt class="col-sm-4">Sentence</dt><dd class="col-sm-8">{{ inmate.sentence_type or '—' }}</dd>
+                    <dt class="col-sm-4">Offence</dt><dd class="col-sm-8">{{ inmate.sentence_type or '—' }}</dd>
+                    {% if inmate.sentence_type == 'Remand' %}
+                    <dt class="col-sm-4">Next date to court</dt><dd class="col-sm-8">{{ inmate.next_court_date or '—' }}</dd>
+                    {% else %}
+                    <dt class="col-sm-4">Sentence</dt><dd class="col-sm-8">{{ inmate.sentence_duration or '—' }}</dd>
                     <dt class="col-sm-4">Expected release</dt><dd class="col-sm-8">{{ inmate.expected_release_date or '—' }}</dd>
+                    {% endif %}
                 </dl>
             </div>
         </div>
