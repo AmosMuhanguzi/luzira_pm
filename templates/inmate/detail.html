@@ -495,7 +495,54 @@
                 </dl>
             </div>
         </div>
-        {% if has_permission(Permissions.MEDICAL_RECORD_CREATE) %}
+        {% if inmate.status == 'Deceased' %}
+        <div class="card shadow-sm border-0 mt-3">
+            <div class="card-header bg-secondary text-white"><i class="bi bi-flower1"></i> Death record</div>
+            <div class="card-body">
+                <dl class="row mb-0">
+                    <dt class="col-6">Date of death</dt>
+                    <dd class="col-6">{{ inmate.date_of_death.strftime('%d %b %Y') if inmate.date_of_death else 'Not recorded (legacy)' }}</dd>
+                    <dt class="col-6">Time</dt>
+                    <dd class="col-6">{{ inmate.time_of_death.strftime('%H:%M') if inmate.time_of_death else '—' }}</dd>
+                    <dt class="col-6">Place</dt><dd class="col-6">{{ inmate.place_of_death or '—' }}</dd>
+                    <dt class="col-6">Cause</dt><dd class="col-6">{{ inmate.cause_of_death or '—' }}</dd>
+                </dl>
+            </div>
+        </div>
+        {% elif inmate.status == 'Active' and has_permission(Permissions.MEDICAL_RECORD_CREATE) %}
+        <div class="card shadow-sm border-0 mt-3">
+            <div class="card-header bg-dark text-white"><i class="bi bi-flower1"></i> Record death</div>
+            <div class="card-body">
+                <form method="POST"
+                      action="{{ url_for('inmate.record_death', inmate_id=inmate.inmate_id) }}"
+                      onsubmit="return confirm('Record this inmate as deceased? This closes their admission and cannot be undone here.');">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <div class="mb-2">
+                        <label class="form-label" for="death-date">Date of death</label>
+                        <input id="death-date" type="date" name="date_of_death"
+                               class="form-control form-control-sm" required
+                               max="{{ today }}">
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label" for="death-time">Time (optional)</label>
+                        <input id="death-time" type="time" name="time_of_death" class="form-control form-control-sm">
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label" for="death-place">Place (optional)</label>
+                        <input id="death-place" type="text" name="place_of_death" maxlength="150"
+                               class="form-control form-control-sm">
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label" for="death-cause">Cause of death</label>
+                        <textarea id="death-cause" name="cause_of_death" rows="2"
+                                  class="form-control form-control-sm" maxlength="2000" required></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-dark btn-sm">Record death</button>
+                </form>
+            </div>
+        </div>
+        {% endif %}
+        {% if has_permission(Permissions.MEDICAL_RECORD_CREATE) and inmate.status != 'Deceased' %}
         <div class="card shadow-sm border-0 mt-3">
             <div class="card-header bg-danger text-white">
                 <i class="bi bi-shield-plus"></i> Medical isolation

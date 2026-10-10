@@ -1,0 +1,198 @@
+{% extends "base.html" %}
+{% block title %}Reports — Luzira PMS{% endblock %}
+{% block page_styles %}
+<link href="{{ url_for('static', filename='css/reports.css') }}" rel="stylesheet">
+{% endblock %}
+
+{% block content %}
+<section class="reports-page">
+    <header class="reports-heading">
+        <div>
+            <p class="reports-eyebrow mb-1">Luzira Prison Management System</p>
+            <h1 class="h2 mb-1">Reports</h1>
+            <p class="text-muted mb-0">Period activity summaries and system audit totals</p>
+        </div>
+        <button type="button" class="btn btn-outline-secondary reports-print-button" onclick="window.print()">
+            <i class="bi bi-printer"></i> Print/Save report
+        </button>
+    </header>
+
+    <nav class="report-type-nav" aria-label="Report period">
+        <a class="btn {{ 'btn-primary' if report_type == 'weekly' else 'btn-outline-primary' }}"
+           href="{{ url_for('reports.index', type='weekly') }}">
+            <i class="bi bi-calendar-week"></i> Weekly
+        </a>
+        <a class="btn {{ 'btn-primary' if report_type == 'monthly' else 'btn-outline-primary' }}"
+           href="{{ url_for('reports.index', type='monthly') }}">
+            <i class="bi bi-calendar-month"></i> Monthly
+        </a>
+        <a class="btn {{ 'btn-primary' if report_type == 'yearly' else 'btn-outline-primary' }}"
+           href="{{ url_for('reports.index', type='yearly') }}">
+            <i class="bi bi-calendar3"></i> Yearly
+        </a>
+        <a class="btn {{ 'btn-primary' if report_type == 'quarterly' else 'btn-outline-primary' }}"
+           href="{{ url_for('reports.index', type='quarterly') }}">
+            <i class="bi bi-bar-chart-line"></i> Quarterly
+        </a>
+    </nav>
+
+    {% if report_type == 'quarterly' %}
+    <nav class="quarter-nav" aria-label="Quarter">
+        {% for quarter_number in range(1, 5) %}
+        <a class="btn btn-sm {{ 'btn-dark' if quarter == quarter_number else 'btn-outline-dark' }}"
+           href="{{ url_for('reports.index', type='quarterly', year=year, quarter=quarter_number) }}">
+            Q{{ quarter_number }}
+        </a>
+        {% endfor %}
+    </nav>
+    {% endif %}
+
+    <form class="report-filter card border-0 shadow-sm" method="get">
+        <input type="hidden" name="type" value="{{ report_type }}">
+        {% if report_type == 'weekly' %}
+        <div class="row g-3 align-items-end">
+            <div class="col-sm-5">
+                <label class="form-label" for="from-date">From</label>
+                <input class="form-control" id="from-date" type="date" name="from_date"
+                       value="{{ report.start.isoformat() }}" required>
+            </div>
+            <div class="col-sm-5">
+                <label class="form-label" for="to-date">To</label>
+                <input class="form-control" id="to-date" type="date" name="to_date"
+                       value="{{ report.end.isoformat() }}" required>
+            </div>
+            <div class="col-sm-2 d-grid">
+                <button class="btn btn-primary" type="submit">Run report</button>
+            </div>
+        </div>
+        {% elif report_type == 'monthly' %}
+        <div class="row g-3 align-items-end">
+            <div class="col-sm-5">
+                <label class="form-label" for="month">Month</label>
+                <select class="form-select" id="month" name="month">
+                    {% for month_number, month_name in month_names %}
+                    <option value="{{ month_number }}" {{ 'selected' if month == month_number }}>{{ month_name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-sm-5">
+                <label class="form-label" for="year">Year</label>
+                <input class="form-control" id="year" type="number" name="year" min="1" max="9998" value="{{ year }}" required>
+            </div>
+            <div class="col-sm-2 d-grid">
+                <button class="btn btn-primary" type="submit">Run report</button>
+            </div>
+        </div>
+        {% else %}
+        <div class="row g-3 align-items-end">
+            <div class="col-sm-10">
+                <label class="form-label" for="year">Year</label>
+                <input class="form-control" id="year" type="number" name="year" min="1" max="9998" value="{{ year }}" required>
+                {% if report_type == 'quarterly' %}
+                <input type="hidden" name="quarter" value="{{ quarter }}">
+                {% endif %}
+            </div>
+            <div class="col-sm-2 d-grid">
+                <button class="btn btn-primary" type="submit">Run report</button>
+            </div>
+        </div>
+        {% endif %}
+    </form>
+
+    <article class="report-sheet">
+        <div class="report-letterhead">
+            <img src="{{ url_for('static', filename='images/luzira-prison-logo.png') }}" alt="">
+            <div>
+                <h2>Luzira Prison</h2>
+                <p class="mb-0">P.O. Box 12345, Kampala</p>
+                <p class="mb-0">Luzira Prison Management System</p>
+            </div>
+            <span class="report-period-badge">{{ report.title }}</span>
+        </div>
+        <div class="report-title-band">
+            <h3>{{ report.title }}</h3>
+            <p class="mb-0">{{ report.start.strftime('%d %B %Y') }} – {{ report.end.strftime('%d %B %Y') }}</p>
+        </div>
+
+        <div class="report-metrics">
+            {% for metric in report.metrics %}
+            <div class="metric-card">
+                <span>{{ metric.label }}</span>
+                <strong>{{ metric.value }}</strong>
+            </div>
+            {% endfor %}
+        </div>
+
+        {% if report.breakdown %}
+        <section class="report-section">
+            <h4>{{ 'Weekly summaries' if report_type == 'monthly' else 'Period summaries' }}</h4>
+            {% for segment in report.breakdown %}
+            <div class="breakdown-group">
+                <h5>{{ segment.label }} <small>{{ segment.start.strftime('%d %b') }} – {{ segment.end.strftime('%d %b %Y') }}</small></h5>
+                <div class="table-responsive">
+                    <table class="table table-sm report-table">
+                        <tbody>
+                            {% for metric in segment.metrics %}
+                            <tr><th scope="row">{{ metric.label }}</th><td>{{ metric.value }}</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                <details class="segment-activities">
+                    <summary>{{ segment.total_audit_events }} logged system activities</summary>
+                    {% if segment.activities %}
+                    <div class="table-responsive">
+                        <table class="table table-sm report-table">
+                            <thead><tr><th>Area</th><th>Activity</th><th class="text-end">Count</th></tr></thead>
+                            <tbody>
+                            {% for activity in segment.activities %}
+                                <tr>
+                                    <td>{{ activity.category }}</td>
+                                    <td>{{ activity.activity }}</td>
+                                    <td class="text-end">{{ activity.count }}</td>
+                                </tr>
+                            {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <p class="report-empty mb-0">No audited activity in this period.</p>
+                    {% endif %}
+                </details>
+            </div>
+            {% endfor %}
+        </section>
+        {% endif %}
+
+        <section class="report-section">
+            <h4>Recorded system activities</h4>
+            <p class="small text-muted">Activity totals are based on actions written to the system audit log for this period.</p>
+            {% if report.activities %}
+            <div class="table-responsive">
+                <table class="table table-sm table-striped report-table">
+                    <thead><tr><th>Area</th><th>Activity</th><th class="text-end">Count</th></tr></thead>
+                    <tbody>
+                    {% for activity in report.activities %}
+                        <tr>
+                            <td>{{ activity.category }}</td>
+                            <td>{{ activity.activity }}</td>
+                            <td class="text-end">{{ activity.count }}</td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                    <tfoot><tr><th colspan="2">Total logged actions</th><th class="text-end">{{ report.total_audit_events }}</th></tr></tfoot>
+                </table>
+            </div>
+            {% else %}
+            <p class="report-empty">No audited system activities were recorded during this period.</p>
+            {% endif %}
+        </section>
+
+        <p class="report-data-note"><i class="bi bi-info-circle"></i> {{ report.death_data_note }}</p>
+        <footer class="report-signoff">
+            <span>Generated {{ current_date.strftime('%d %B %Y') }}</span>
+            <span>Authorised system administrator</span>
+        </footer>
+    </article>
+</section>
+{% endblock %}

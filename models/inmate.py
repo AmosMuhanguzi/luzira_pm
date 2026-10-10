@@ -49,6 +49,14 @@ class Inmate(BaseModel):
     expected_release_date = db.Column(db.Date, index=True)
     actual_release_date   = db.Column(db.Date)
 
+    # ---- Death record ----
+    date_of_death         = db.Column(db.Date, index=True)
+    time_of_death         = db.Column(db.Time)
+    place_of_death        = db.Column(db.String(150))
+    cause_of_death        = db.Column(db.Text)
+    death_recorded_by     = db.Column(db.Integer, db.ForeignKey('user_accounts.user_id'))
+    death_recorded_at     = db.Column(db.DateTime)
+
     # ---- Facility ----
     cell_block              = db.Column(db.String(20), index=True)
     cell_number             = db.Column(db.String(20))

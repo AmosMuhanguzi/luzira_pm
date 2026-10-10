@@ -8,6 +8,7 @@ from models.inmate import Inmate
 from models.visitor import Visitor
 from models.visit import VisitLog
 from models.cell import CellBlock  # Adjust model import if named differently (e.g. Cell)
+from services.date_ranges import current_week_dates, format_week_range
 
 @main_bp.route('/dashboard')
 @login_required
@@ -41,20 +42,21 @@ def dashboard():
     overall_capacity_pct = round((total_occupied / total_capacity) * 100, 1) if total_capacity > 0 else 0
 
     # 5. Weekly Trend Data for Chart.js
-    days = [today - timedelta(days=i) for i in range(6, -1, -1)]
-    chart_labels = [d.strftime('%a') for d in days]
-    
+    week_dates = current_week_dates(today)
+    chart_labels = [d.strftime('%d %b') for d in week_dates]
+    chart_week_range = format_week_range(week_dates)
+
     chart_intakes = [
         Inmate.query.filter(func.date(getattr(Inmate, 'admission_date', getattr(Inmate, 'created_at', None))) == d).count()
-        for d in days
+        for d in week_dates
     ]
     chart_releases = [
         Inmate.query.filter(func.date(getattr(Inmate, 'release_date', None)) == d).count() if hasattr(Inmate, 'release_date') else 0
-        for d in days
+        for d in week_dates
     ]
     chart_visitors = [
         VisitLog.query.filter(func.date(getattr(VisitLog, 'check_in_time', getattr(VisitLog, 'created_at', None))) == d).count()
-        for d in days
+        for d in week_dates
     ]
 
     return render_template(
@@ -74,7 +76,8 @@ def dashboard():
         chart_labels=chart_labels,
         chart_intakes=chart_intakes,
         chart_releases=chart_releases,
-        chart_visitors=chart_visitors
+        chart_visitors=chart_visitors,
+        chart_week_range=chart_week_range
     )
 
 # Modal JSON API endpoint for cell block inmates

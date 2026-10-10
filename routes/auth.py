@@ -232,6 +232,7 @@ from zoneinfo import ZoneInfo
 
 # Import your database extensions and models here
 from extensions import db
+from services.date_ranges import chart_label, format_week_range, resolve_chart_dates
 from models.inmate import Inmate
 from models.visitor import Visitor
 from models.visit import VisitLog
@@ -366,23 +367,32 @@ def dashboard():
     overall_capacity_pct = round((total_occupied / total_capacity) * 100, 1) if total_capacity > 0 else 0
 
     # 5. Weekly Trend Calculations for Chart.js
-    days = [today - timedelta(days=i) for i in range(6, -1, -1)]
-    chart_labels = [d.strftime('%a') for d in days]
-    
+    chart_from = request.args.get('chart_from', '').strip()
+    chart_to = request.args.get('chart_to', '').strip()
+    week_dates, chart_is_current_week, chart_error = resolve_chart_dates(
+        chart_from, chart_to, today
+    )
+    if chart_error:
+        flash(chart_error, 'warning')
+    chart_labels = [chart_label(d, len(week_dates)) for d in week_dates]
+    chart_week_range = format_week_range(week_dates)
+    chart_from_value = week_dates[0].isoformat()
+    chart_to_value = week_dates[-1].isoformat()
+
     chart_intakes = [
         Inmate.query.filter(func.date(getattr(Inmate, 'admission_date', getattr(Inmate, 'created_at', None))) == d).count()
-        for d in days
+        for d in week_dates
     ]
     chart_releases = [
         AdmissionEpisode.query.filter_by(release_date=d).count()
-        for d in days
+        for d in week_dates
     ]
     chart_visitors = [
         VisitLog.query.filter(
             VisitLog.check_in_time >= _utc_bounds_for_facility_date(d)[0],
             VisitLog.check_in_time < _utc_bounds_for_facility_date(d)[1],
         ).count()
-        for d in days
+        for d in week_dates
     ]
 
     return render_template(
@@ -404,6 +414,10 @@ def dashboard():
         chart_intakes=chart_intakes,
         chart_releases=chart_releases,
         chart_visitors=chart_visitors,
+        chart_week_range=chart_week_range,
+        chart_from_value=chart_from_value,
+        chart_to_value=chart_to_value,
+        chart_is_current_week=chart_is_current_week,
         recent_medical_records=recent_medical_records,
         medical_record_count=medical_record_count,
         pending_medical_submission_count=pending_medical_submission_count,

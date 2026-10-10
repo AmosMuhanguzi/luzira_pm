@@ -82,6 +82,11 @@
                 {# ----- System Administrator only ----- #}
                 {% if current_user.role_name == 'System Administrator' %}
                 <li class="nav-item">
+                    <a class="nav-link" href="{{ url_for('reports.index') }}">
+                        <i class="bi bi-file-earmark-bar-graph"></i> Reports
+                    </a>
+                </li>
+                <li class="nav-item">
                     <a class="nav-link" href="{{ url_for('admin.users_list') }}">
                         <img class="staff-icon staff-icon--nav"
                              src="{{ url_for('static', filename='images/staff-icon.png') }}"
@@ -224,7 +229,7 @@
 {# ==================================================================== #}
 <footer class="text-center text-muted small py-3 border-top">
     Luzira Prison Management System &copy; 2026
-    — Universal Technology and Management University
+    — Universal Technology and Management University - Amos Muhanguzi | Nakalembe Sarah
 </footer>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>

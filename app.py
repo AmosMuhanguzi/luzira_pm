@@ -68,6 +68,9 @@ def create_app(config_name=None):
     from routes.exports import exports_bp
     app.register_blueprint(exports_bp)
 
+    from routes.report import reports_bp
+    app.register_blueprint(reports_bp)
+
     from routes.ai import ai_bp                    
     app.register_blueprint(ai_bp)
 

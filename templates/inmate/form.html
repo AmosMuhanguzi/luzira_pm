@@ -133,9 +133,22 @@
                     <textarea name="crime_description" class="form-control" rows="2">{{ data.crime_description or (inmate.crime_description if editing else '') }}</textarea>
                 </div>
                 <div class="col-md-4">
+                    <label class="form-label">Sentence</label>
+                    <div class="input-group">
+                        <input type="number" id="sentenceValue" name="sentence_value" class="form-control"
+                               min="0.5" step="0.5" placeholder="e.g. 1">
+                        <select id="sentenceUnit" name="sentence_unit" class="form-select">
+                            <option value="year">Year(s)</option>
+                            <option value="month">Month(s)</option>
+                        </select>
+                    </div>
+                    <div class="form-text">1 year = 360 days, 1 month = 30 days</div>
+                </div>
+                <div class="col-md-4">
                     <label class="form-label">Expected release date</label>
-                    <input type="date" name="expected_release_date" class="form-control"
+                    <input type="date" id="expectedRelease" name="expected_release_date" class="form-control" readonly
                            value="{{ data.expected_release_date or (inmate.expected_release_date if editing else '') }}">
+                    <div id="expectedReleaseNote" class="form-text">Calculated automatically (sentence less 1/10).</div>
                 </div>
             </div>
         </div>
@@ -243,6 +256,28 @@
 <script src="{{ url_for('static', filename='js/person-photo-capture.js') }}"></script>
 <script src="{{ url_for('static', filename='js/fingerprint-enrollment.js') }}"></script>
 
+<script>
+(function () {
+    const value = document.getElementById('sentenceValue');
+    const unit = document.getElementById('sentenceUnit');
+    const out = document.getElementById('expectedRelease');
+    const note = document.getElementById('expectedReleaseNote');
+    function recalc() {
+        const n = parseFloat(value.value);
+        if (!(n > 0)) { out.value = ''; return; }
+        const total = n * (unit.value === 'year' ? 360 : 30);
+        const remission = Math.round(total / 10);
+        const served = Math.round(total) - remission;
+        const d = new Date();
+        d.setDate(d.getDate() + served);
+        const pad = x => String(x).padStart(2, '0');
+        out.value = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+        note.textContent = `${Math.round(total)} − (1/10 × ${Math.round(total)} = ${remission}) = ${served} days (${(served / 30).toFixed(1)} months) → ${d.toLocaleString('en-GB', {month: 'long', year: 'numeric'})}`;
+    }
+    value.addEventListener('input', recalc);
+    unit.addEventListener('change', recalc);
+})();
+</script>
 <script>
 const cellAssignmentUrl = {{ url_for('inmate.api_cell_assignment')|tojson }};
 const cellBlockSelect = document.getElementById('cellBlock');

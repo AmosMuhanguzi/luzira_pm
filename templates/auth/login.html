@@ -2,14 +2,18 @@
 {% block title %}Sign in — Luzira PMS{% endblock %}
 
 {% block content %}
-<div class="row justify-content-center" style="margin-top: 8vh;">
-    <div class="col-md-5 col-lg-4">
-        <div class="card shadow-lg border-0">
+<div class="row justify-content-center login-layout">
+    <div class="col-md-6 col-lg-5 col-xl-4">
+        <div class="card login-card border-0">
             <div class="card-body p-4 p-md-5">
-                <div class="text-center mb-4">
-                    <i class="bi bi-shield-lock-fill text-primary" style="font-size: 3rem;"></i>
-                    <h3 class="mt-2 mb-1">Luzira Prison</h3>
-                    <p class="text-muted small mb-0">Management System</p>
+                <div class="login-brand text-center">
+                    <div class="login-brand-photo">
+                        <img src="{{ url_for('static', filename='images/login-fingerprint-scan.png') }}"
+                             alt="Fingerprint scan">
+                    </div>
+                    <p class="login-brand-kicker mb-2">Secure staff access</p>
+                    <h1 class="login-brand-title mb-1">Luzira Prison</h1>
+                    <p class="text-muted mb-0">Management System</p>
                 </div>
 
                 <form method="POST" novalidate>
@@ -39,10 +43,10 @@
                         {% endfor %}
                     </div>
 
-                                        <button type="submit" class="btn btn-primary w-100 py-2">
+                    <button type="submit" class="btn btn-primary login-submit w-100 py-2">
                         <i class="bi bi-arrow-right-circle"></i> {{ form.submit.label.text }}
                     </button>
-                    <p class="text-muted small text-center mt-3 mb-0">
+                    <p class="login-fingerprint-note text-muted small text-center mt-3 mb-0">
                         <i class="bi bi-fingerprint"></i>
                         Fingerprint verification is required after your password.
                     </p>

@@ -1,8 +1,8 @@
 :root {
-    --dashboard-ink: #172b4d;
-    --dashboard-muted: #64748b;
+    --dashboard-ink: #3b1f1f;
+    --dashboard-muted: #6f6360;
     --dashboard-surface: #ffffff;
-    --dashboard-line: #e6edf5;
+    --dashboard-line: #eddcdc;
 }
 
 .dashboard-page {
@@ -10,7 +10,7 @@
 }
 
 .dashboard-heading h2 {
-    color: #17324d;
+    color: #3b1f1f;
     font-weight: 750;
     letter-spacing: -0.035em;
 }
@@ -24,13 +24,13 @@
 }
 
 .dashboard-heading .badge {
-    background: #2563eb !important;
+    background: #800000 !important;
     border-radius: 999px;
     padding: 0.45em 0.75em;
 }
 
 .dashboard-quick-actions {
-    background: linear-gradient(110deg, #ffffff 0%, #f3f8fb 100%);
+    background: linear-gradient(110deg, #ffffff 0%, #fbf3f3 100%);
     border: 1px solid var(--dashboard-line) !important;
     border-radius: 1rem;
     box-shadow: 0 0.45rem 1.2rem rgba(24, 55, 85, 0.08) !important;
@@ -145,14 +145,14 @@
 }
 
 .dashboard-kpi--inmates {
-    --kpi-gradient: linear-gradient(135deg, #2563eb 0%, #4f46e5 100%);
-    --kpi-shadow: rgba(37, 99, 235, 0.2);
+    --kpi-gradient: linear-gradient(135deg, #800000 0%, #4e0000 100%);
+    --kpi-shadow: rgba(128, 0, 0, 0.22);
     --kpi-label: rgba(255, 255, 255, 0.84);
 }
 
 .dashboard-kpi--visitors {
-    --kpi-gradient: linear-gradient(135deg, #0891b2 0%, #0f766e 100%);
-    --kpi-shadow: rgba(8, 145, 178, 0.2);
+    --kpi-gradient: linear-gradient(135deg, #a52a2a 0%, #6d1212 100%);
+    --kpi-shadow: rgba(165, 42, 42, 0.2);
     --kpi-label: rgba(255, 255, 255, 0.86);
 }
 
@@ -181,8 +181,8 @@
 }
 
 .dashboard-kpi--occupancy {
-    --kpi-gradient: linear-gradient(135deg, #8b5cf6 0%, #5b21b6 100%);
-    --kpi-shadow: rgba(124, 58, 237, 0.2);
+    --kpi-gradient: linear-gradient(135deg, #8a6508 0%, #5c4305 100%);
+    --kpi-shadow: rgba(138, 101, 8, 0.22);
     --kpi-label: rgba(255, 255, 255, 0.86);
 }
 

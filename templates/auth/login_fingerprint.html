@@ -15,8 +15,16 @@
                 </p>
 
                 <div id="scanPanel">
-                    <div id="scanIcon" class="mb-3">
-                        <i class="bi bi-fingerprint text-secondary" style="font-size: 5rem;"></i>
+                    <div id="scanIcon" class="fingerprint-video-wrap mb-3">
+                        <video class="fingerprint-animation" muted loop playsinline preload="metadata"
+                               aria-hidden="true">
+                            <source src="{{ url_for('static', filename='videos/fingerprint-security.mp4') }}"
+                                    type="video/mp4">
+                        </video>
+                        <i class="bi bi-fingerprint text-secondary fingerprint-video-fallback"
+                           aria-hidden="true"></i>
+                        <i class="bi bi-x-circle-fill text-danger fingerprint-video-error"
+                           aria-hidden="true"></i>
                     </div>
                     <h5 id="scanStatus">Waiting for scan…</h5>
                     <p class="text-muted small" id="scanDetail">
@@ -61,14 +69,24 @@ const scanStatus = document.getElementById('scanStatus');
 const scanDetail = document.getElementById('scanDetail');
 const scanIcon = document.getElementById('scanIcon');
 const scanProgress = document.getElementById('scanProgress');
+const fingerprintAnimation = document.querySelector('.fingerprint-animation');
 
 scanBtn.addEventListener('click', startScan);
+fingerprintAnimation.addEventListener('error', () => {
+    fingerprintAnimation.classList.add('is-unavailable');
+});
+
+if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    fingerprintAnimation.play().catch(() => {
+        fingerprintAnimation.classList.add('is-unavailable');
+    });
+}
 
 async function startScan() {
     scanBtn.disabled = true;
+    scanIcon.classList.remove('has-error');
     scanStatus.textContent = 'Scanning…';
     scanDetail.textContent = 'Keep your finger steady on the scanner.';
-    scanIcon.innerHTML = '<i class="bi bi-fingerprint text-primary pulse" style="font-size:5rem;"></i>';
     animateProgress();
 
     try {
@@ -104,7 +122,7 @@ async function startScan() {
 }
 
 function showError(msg) {
-    scanIcon.innerHTML = '<i class="bi bi-x-circle-fill text-danger" style="font-size:5rem;"></i>';
+    scanIcon.classList.add('has-error');
     scanStatus.textContent = 'Verification failed';
     scanDetail.textContent = msg;
     scanProgress.style.width = '0%';

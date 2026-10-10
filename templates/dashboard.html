@@ -232,7 +232,32 @@
     <!-- Visual Trends Graph -->
     <div class="col-lg-8">
         <div class="card border-0 shadow-sm h-100 dashboard-panel">
-            <div class="card-header bg-white fw-bold py-3"><i class="bi bi-graph-up text-primary"></i> Intake, Release & Visitor Trends</div>
+            <div class="card-header bg-white py-3">
+                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+                    <span class="fw-bold"><i class="bi bi-graph-up text-primary"></i> Intake, Release & Visitor Trends</span>
+                    <span class="small fw-semibold text-muted">
+                        {{ 'This week: ' if chart_is_current_week else 'Selected: ' }}{{ chart_week_range | default('') }}
+                    </span>
+                </div>
+                <form method="get" class="row g-2 align-items-end mt-1">
+                    <div class="col-auto">
+                        <label class="form-label small mb-0" for="chartFrom">From</label>
+                        <input type="date" id="chartFrom" name="chart_from" class="form-control form-control-sm"
+                               value="{{ chart_from_value }}">
+                    </div>
+                    <div class="col-auto">
+                        <label class="form-label small mb-0" for="chartTo">To</label>
+                        <input type="date" id="chartTo" name="chart_to" class="form-control form-control-sm"
+                               value="{{ chart_to_value }}">
+                    </div>
+                    <div class="col-auto d-flex gap-2">
+                        <button type="submit" class="btn btn-primary btn-sm">View</button>
+                        {% if not chart_is_current_week %}
+                        <a href="{{ url_for('auth.dashboard') }}" class="btn btn-outline-secondary btn-sm">Current week</a>
+                        {% endif %}
+                    </div>
+                </form>
+            </div>
             <div class="card-body">
                 <canvas id="analyticsChart" height="130"></canvas>
             </div>

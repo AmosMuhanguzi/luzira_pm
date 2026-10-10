@@ -10,6 +10,7 @@ from models.cell import CellBlock
 from models.inmate import Inmate, AdmissionEpisode
 from models.audit import AuditEvent
 from services.medical_record_service import MedicalRecordService
+from services.sentence import expected_release, parse_sentence, sentence_label
 
 
 class InmateService:
@@ -136,6 +137,17 @@ class InmateService:
         return Inmate.query.get(inmate_id)
 
     @staticmethod
+    def _apply_sentence(inmate, data):
+        parsed = parse_sentence(data.get('sentence_value'), data.get('sentence_unit'))
+        if not parsed:
+            return
+        number, unit = parsed
+        start = date.today()
+        inmate.sentence_duration = sentence_label(number, unit)
+        inmate.sentence_start_date = start
+        inmate.expected_release_date = expected_release(start, number, unit)['release_date']
+
+    @staticmethod
     def generate_inmate_number() -> str:
         year = date.today().year
         prefix = f'LZR-{year}-'
@@ -204,6 +216,7 @@ class InmateService:
                 ).date()
             except ValueError:
                 pass
+        InmateService._apply_sentence(inmate, data)
 
         if fingerprint_template:
             try:
@@ -314,6 +327,7 @@ class InmateService:
                 ).date()
             except ValueError:
                 pass
+        InmateService._apply_sentence(inmate, data)
 
         episode = AdmissionEpisode(
             inmate_id=inmate.inmate_id,

@@ -2,7 +2,7 @@
 import base64
 import os
 import secrets
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, time, timedelta, timezone
 from decimal import Decimal
 from zoneinfo import ZoneInfo
 from flask import (Blueprint, render_template, redirect, url_for,
@@ -1291,6 +1291,103 @@ def update_medical_isolation(inmate_id):
         'success',
     )
     return redirect(url_for('inmate.detail', inmate_id=inmate_id))
+
+
+@inmate_bp.route('/<int:inmate_id>/record-death', methods=['POST'])
+@login_required
+@require_permission(Permissions.MEDICAL_RECORD_CREATE)
+def record_death(inmate_id):
+    inmate = InmateService.get(inmate_id)
+    if not inmate:
+        abort(404)
+
+    def back():
+        return redirect(url_for('inmate.detail', inmate_id=inmate_id))
+
+    if inmate.status != 'Active':
+        flash('A death can only be recorded for an inmate who is currently in custody.', 'danger')
+        return back()
+
+    try:
+        death_date = date.fromisoformat((request.form.get('date_of_death') or '').strip())
+    except ValueError:
+        flash('Enter a valid date of death.', 'danger')
+        return back()
+
+    time_text = (request.form.get('time_of_death') or '').strip()
+    try:
+        death_time = time.fromisoformat(time_text) if time_text else None
+    except ValueError:
+        flash('Enter a valid time of death.', 'danger')
+        return back()
+
+    episode = inmate.admission_episodes.filter_by(is_current=True).first()
+    admitted_on = (
+        episode.admission_date if episode else inmate.current_admission_date
+    )
+    if death_date > date.today():
+        flash('The date of death cannot be in the future.', 'danger')
+        return back()
+    if admitted_on and death_date < admitted_on:
+        flash('The date of death cannot be before the admission date.', 'danger')
+        return back()
+
+    cause = (request.form.get('cause_of_death') or '').strip()
+    if not cause:
+        flash('Enter the cause of death.', 'danger')
+        return back()
+    place = (request.form.get('place_of_death') or '').strip()[:150] or None
+
+    open_transfer = WorkTransferLog.query.filter_by(
+        inmate_id=inmate.inmate_id, checked_in_at=None
+    ).first()
+    if open_transfer:
+        open_transfer.checked_in_at = datetime.now()
+
+    old_cell = inmate.cell_block
+    inmate.status = 'Deceased'
+    inmate.date_of_death = death_date
+    inmate.time_of_death = death_time
+    inmate.place_of_death = place
+    inmate.cause_of_death = cause
+    inmate.death_recorded_by = current_user.user_id
+    inmate.death_recorded_at = datetime.now()
+    inmate.actual_release_date = death_date
+    inmate.cell_block = None
+    inmate.cell_number = None
+    if episode:
+        episode.release_date = death_date
+        episode.release_type = 'Death'
+        episode.release_notes = cause
+        episode.releasing_officer_id = current_user.user_id
+        episode.is_current = False
+
+    AuditEvent.log_event(
+        event_category='Inmate',
+        event_type='Death recorded',
+        event_description=(
+            f'Death recorded for inmate {inmate.inmate_number} ({inmate.full_name}) '
+            f'on {death_date.isoformat()}.'
+        ),
+        entity_type='Inmate',
+        entity_id=inmate.inmate_id,
+        user_id=current_user.user_id,
+        username=current_user.username,
+        user_role=current_user.role_name,
+        ip_address=request.remote_addr,
+        user_agent=request.headers.get('User-Agent'),
+        old_values={'status': 'Active', 'cell_block': old_cell},
+        new_values={
+            'status': 'Deceased',
+            'date_of_death': death_date.isoformat(),
+            'time_of_death': death_time.isoformat() if death_time else None,
+            'place_of_death': place,
+            'cause_of_death': cause,
+        },
+    )
+    db.session.commit()
+    flash(f'Death of {inmate.full_name} recorded for {death_date.strftime("%d %b %Y")}.', 'success')
+    return back()
 
 
 @inmate_bp.route('/<int:inmate_id>/disciplinary', methods=['POST'])
