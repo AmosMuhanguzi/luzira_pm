@@ -22,7 +22,7 @@
     filter: blur(3px);
     opacity: 0;
     transform: scale(1.06);
-    animation: dashboard-slide-show 54s ease-in-out infinite;
+    animation: dashboard-slide-show 63s ease-in-out infinite;
     will-change: opacity, transform;
 }
 
@@ -56,6 +56,11 @@
     animation-delay: 45s;
 }
 
+.dashboard-slide-extra {
+    background-image: url("../images/luzira-slide-7.jpg");
+    animation-delay: 54s;
+}
+
 .dashboard-slide-shade {
     position: absolute;
     inset: 0;
@@ -76,14 +81,14 @@
         opacity: 0;
         transform: scale(1.06);
     }
-    3.7% {
-        opacity: 1;
+    3.2% {
+        opacity: .98;
     }
-    14% {
-        opacity: 1;
+    12.2% {
+        opacity: .98;
         transform: scale(1.12);
     }
-    17%,
+    14.6%,
     100% {
         opacity: 0;
         transform: scale(1.14);
@@ -97,6 +102,6 @@
     }
 
     .dashboard-slide-gate {
-        opacity: 1;
+        opacity: .98;
     }
 }

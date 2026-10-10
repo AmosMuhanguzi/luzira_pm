@@ -252,6 +252,12 @@ footer {
     margin-top: 3rem;
 }
 
+footer.text-muted,
+footer {
+    color: #800000 !important;
+    font-weight: 500;
+}
+
 /* Login card hover */
 .card.shadow-lg {
     transition: transform 0.2s ease-in-out;
