@@ -2,12 +2,13 @@ import calendar
 import json
 from datetime import date, datetime, time, timedelta
 
-from sqlalchemy import case, distinct, func
+from sqlalchemy import and_, case, distinct, func
 
 from extensions import db
 from models.audit import AuditEvent
 from models.inmate import AdmissionEpisode, Inmate
 from models.medical import DisciplinaryLog, EscapeAttemptLog, MedicalRecord, WorkTransferLog
+from models.user import UserAccount
 from models.visit import VisitLog
 from models.visitor import VisitorBlacklistEvent
 
@@ -234,3 +235,80 @@ def build_report(report_type, start, end, segments):
         'breakdown': breakdown,
         'death_data_note': death_note,
     }
+
+
+def build_user_audit_trails():
+    login_success_filter = and_(
+        AuditEvent.event_category == 'Authentication',
+        AuditEvent.event_type == 'Login',
+        AuditEvent.success.is_(True),
+    )
+
+    user_rows = (
+        db.session.query(
+            UserAccount.user_id,
+            UserAccount.full_name,
+            UserAccount.username,
+            UserAccount.last_login,
+            func.coalesce(func.count(AuditEvent.event_id), 0).label('activity_count'),
+            func.coalesce(
+                func.sum(case((login_success_filter, 1), else_=0)),
+                0,
+            ).label('total_logins'),
+        )
+        .outerjoin(AuditEvent, AuditEvent.user_id == UserAccount.user_id)
+        .group_by(
+            UserAccount.user_id,
+            UserAccount.full_name,
+            UserAccount.username,
+            UserAccount.last_login,
+        )
+        .order_by(
+            UserAccount.full_name.asc(),
+            UserAccount.username.asc(),
+        )
+        .all()
+    )
+
+    user_ids = [row.user_id for row in user_rows]
+    per_user_events = {user_id: [] for user_id in user_ids}
+    if user_ids:
+        events = (
+            AuditEvent.query.with_entities(
+                AuditEvent.user_id,
+                AuditEvent.event_timestamp,
+                AuditEvent.event_category,
+                AuditEvent.event_type,
+                AuditEvent.event_description,
+            )
+            .filter(AuditEvent.user_id.in_(user_ids))
+            .order_by(
+                AuditEvent.user_id.asc(),
+                AuditEvent.event_timestamp.desc(),
+            )
+            .all()
+        )
+        limits = {user_id: 0 for user_id in user_ids}
+        for event in events:
+            if limits[event.user_id] >= 20:
+                continue
+            per_user_events[event.user_id].append({
+                'at': event.event_timestamp,
+                'category': event.event_category or 'Uncategorized',
+                'type': event.event_type or 'Unspecified',
+                'description': event.event_description or '',
+            })
+            limits[event.user_id] += 1
+
+    return [
+        {
+            'user_id': row.user_id,
+            'name': row.full_name,
+            'username': row.username,
+            'total_logins': int(row.total_logins or 0),
+            'last_login': row.last_login,
+            'total_activities': int(row.activity_count or 0),
+            'activities': per_user_events.get(row.user_id, []),
+        }
+        for row in user_rows
+    ]

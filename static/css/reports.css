@@ -15,6 +15,19 @@
     margin-bottom: 1.25rem;
 }
 
+.reports-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .5rem;
+}
+
+.audit-trail-icon {
+    width: 1.5rem;
+    height: 1.5rem;
+    margin-right: .25rem;
+    vertical-align: middle;
+}
+
 .reports-eyebrow {
     color: #800000;
     font-size: .75rem;
@@ -250,10 +263,171 @@
     font-size: .9rem;
 }
 
+.audit-user-grid {
+    display: grid;
+    gap: .9rem;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+}
+
+.audit-user-card {
+    border: 1px solid #e4e7ea;
+    border-radius: .55rem;
+    padding: .9rem;
+    background: #fffdfb;
+}
+
+.audit-user-card--summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    text-align: left;
+    cursor: pointer;
+    transition: box-shadow .15s, border-color .15s;
+}
+
+.audit-user-card--summary:hover {
+    border-color: #800000;
+    box-shadow: 0 .25rem .75rem rgba(128, 0, 0, .12);
+}
+
+.audit-user-card--summary .bi {
+    color: #800000;
+}
+
+.audit-user-card--summary.is-active {
+    border-color: #800000;
+    background: #fff2d2;
+}
+
+.audit-user-card--summary.is-active .bi {
+    transform: rotate(180deg);
+}
+
+.audit-user-detail {
+    margin-top: 1.25rem;
+    border: 1px solid #e4e7ea;
+    border-top: 3px solid #800000;
+    border-radius: .55rem;
+    background: #fff;
+}
+
+.audit-user-detail[hidden] {
+    display: none !important;
+}
+
+.audit-user-detail__head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: .75rem;
+    padding: .9rem 1rem;
+    border-bottom: 1px solid #e5e7e9;
+    background: #f7f2f0;
+}
+
+.audit-user-detail__head h4 {
+    color: #4d0000;
+    font-weight: 700;
+}
+
+.audit-user-detail__actions {
+    display: flex;
+    gap: .4rem;
+}
+
+.audit-user-detail__actions .btn-primary {
+    border-color: #800000;
+    background: #800000;
+}
+
+.audit-user-detail__body {
+    padding: 1rem;
+}
+
+.audit-user-card__header {
+    display: flex;
+    flex-direction: column;
+}
+
+.audit-user-card__name {
+    color: #4d0000;
+    font-size: 1.05rem;
+    font-weight: 700;
+}
+
+.audit-user-card__username {
+    color: #6d757c;
+    font-size: .85rem;
+}
+
+.audit-user-card__stats {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: .6rem;
+    margin-top: .8rem;
+}
+
+.audit-user-card__stats div {
+    background: #fff;
+    border: 1px solid #eceff1;
+    border-left: 3px solid #800000;
+    border-radius: .45rem;
+    padding: .55rem;
+    min-height: 4rem;
+}
+
+.audit-user-card__stats span {
+    display: block;
+    color: #616a71;
+    font-size: .73rem;
+}
+
+.audit-user-card__stats strong {
+    color: #4f0000;
+    font-size: .95rem;
+    font-weight: 700;
+}
+
+.audit-user-card__activity-title {
+    margin: .9rem 0 .45rem;
+    color: #5a0000;
+    font-size: .92rem;
+    font-weight: 700;
+}
+
+.audit-user-card__activity-list {
+    margin: 0;
+    padding-left: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: .45rem;
+}
+
+.audit-user-card__activity-list li {
+    color: #394148;
+    font-size: .82rem;
+}
+
+.audit-user-card__activity-meta {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: .35rem;
+    margin-bottom: .12rem;
+    color: #6d757c;
+    font-size: .73rem;
+}
+
 @media (max-width: 575.98px) {
     .reports-heading {
         align-items: flex-start;
         flex-direction: column;
+    }
+
+    .audit-user-card__stats {
+        grid-template-columns: 1fr;
     }
 
     .report-period-badge {
@@ -282,8 +456,21 @@
     .report-type-nav,
     .quarter-nav,
     .report-filter,
-    .reports-print-button {
+    .reports-print-button,
+    .reports-actions .btn-outline-primary,
+    .audit-user-grid,
+    .audit-user-detail__actions {
         display: none !important;
+    }
+
+    .audit-user-detail {
+        border: 0;
+        margin-top: .5rem;
+    }
+
+    .audit-user-detail__head {
+        print-color-adjust: exact;
+        -webkit-print-color-adjust: exact;
     }
 
     main.container {

@@ -8,7 +8,7 @@ from unittest.mock import patch
 
 from extensions import db
 from services.report_service import (
-    month_segments, period_bounds, summarize_period, undated_death_count,
+    build_user_audit_trails, month_segments, period_bounds, summarize_period, undated_death_count,
 )
 
 
@@ -77,6 +77,7 @@ class ReportServiceTests(unittest.TestCase):
     def test_reports_template_compiles(self):
         with self.app.app_context():
             self.app.jinja_env.get_template('admin/reports.html')
+            self.app.jinja_env.get_template('admin/report_audit_trails.html')
 
     def test_summary_counts_events_inclusive_of_end_date(self):
         start = date(2026, 3, 2)
@@ -189,6 +190,66 @@ class ReportServiceTests(unittest.TestCase):
             session['_fresh'] = True
         with patch('routes.report.render_template', return_value=Response('ok')):
             self.assertEqual(admin_client.get('/admin/reports/').status_code, 200)
+            self.assertEqual(admin_client.get('/admin/reports/audit-trails').status_code, 200)
+
+    def test_user_audit_trails_include_login_totals_and_recent_activities(self):
+        with self.app.app_context():
+            from models import AuditEvent, Role, UserAccount
+
+            db.drop_all()
+            db.create_all()
+
+            role = Role(role_name='Receptionist', description='Test role')
+            user = UserAccount(
+                username='amo',
+                email='amo@example.com',
+                full_name='Amo Reception',
+                role=role,
+                is_active=True,
+            )
+            user.set_password('StrongPassword123')
+            user.last_login = datetime(2026, 3, 8, 10, 30)
+
+            db.session.add_all([role, user])
+            db.session.flush()
+            db.session.add_all([
+                AuditEvent(
+                    event_category='Authentication',
+                    event_type='Login',
+                    event_description='Successful login for "amo"',
+                    user_id=user.user_id,
+                    username=user.username,
+                    success=True,
+                    event_timestamp=datetime(2026, 3, 8, 10, 30),
+                ),
+                AuditEvent(
+                    event_category='Inmate',
+                    event_type='Create',
+                    event_description='Created inmate intake #LZR-1001',
+                    user_id=user.user_id,
+                    username=user.username,
+                    success=True,
+                    event_timestamp=datetime(2026, 3, 8, 11, 15),
+                ),
+                AuditEvent(
+                    event_category='Inmate',
+                    event_type='Edit',
+                    event_description='Edited inmate profile #LZR-1001',
+                    user_id=user.user_id,
+                    username=user.username,
+                    success=True,
+                    event_timestamp=datetime(2026, 3, 8, 12, 5),
+                ),
+            ])
+            db.session.commit()
+
+            cards = build_user_audit_trails()
+            amo_card = next(card for card in cards if card['username'] == 'amo')
+
+            self.assertEqual(amo_card['total_logins'], 1)
+            self.assertEqual(amo_card['total_activities'], 3)
+            self.assertEqual(amo_card['last_login'], datetime(2026, 3, 8, 10, 30))
+            self.assertEqual(amo_card['activities'][0]['description'], 'Edited inmate profile #LZR-1001')
 
 
 if __name__ == '__main__':

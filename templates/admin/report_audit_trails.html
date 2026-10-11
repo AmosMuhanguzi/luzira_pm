@@ -1,0 +1,148 @@
+{% extends "base.html" %}
+{% block title %}Audit Trails — Luzira PMS{% endblock %}
+{% block page_styles %}
+<link href="{{ url_for('static', filename='css/reports.css') }}" rel="stylesheet">
+{% endblock %}
+
+{% block content %}
+<section class="reports-page">
+    <header class="reports-heading">
+        <div>
+            <p class="reports-eyebrow mb-1">Luzira Prison Management System</p>
+            <h1 class="h2 mb-1">User Audit Trails</h1>
+            <p class="text-muted mb-0">User-by-user activity history, login totals, and recent actions.</p>
+        </div>
+        <div class="reports-actions">
+            <a class="btn btn-outline-primary" href="{{ url_for('reports.index') }}">
+                <i class="bi bi-arrow-left"></i> Back to reports
+            </a>
+            <button type="button" class="btn btn-outline-secondary reports-print-button" onclick="window.print()">
+                <i class="bi bi-printer"></i> Print/Save report
+            </button>
+        </div>
+    </header>
+
+    <article class="report-sheet">
+        <div class="report-letterhead">
+            <img src="{{ url_for('static', filename='images/luzira-prison-logo.png') }}" alt="">
+            <div>
+                <h2>Luzira Prison</h2>
+                <p class="mb-0">P.O. Box 12345, Kampala</p>
+                <p class="mb-0">Luzira Prison Management System</p>
+            </div>
+            <span class="report-period-badge">Audit Trails</span>
+        </div>
+        <div class="report-title-band">
+            <h3>User Audit Trails</h3>
+            <p class="mb-0">Generated {{ current_date.strftime('%d %B %Y') }}</p>
+        </div>
+
+        {% if user_cards %}
+        <section class="audit-user-grid">
+            {% for user in user_cards %}
+            <button type="button" class="audit-user-card audit-user-card--summary"
+                    data-audit-target="audit-user-{{ user.user_id }}" aria-expanded="false"
+                    aria-controls="audit-user-{{ user.user_id }}">
+                <span class="audit-user-card__header">
+                    <span class="audit-user-card__name">{{ user.name }}</span>
+                    <span class="audit-user-card__username">@{{ user.username }}</span>
+                </span>
+                <i class="bi bi-chevron-down"></i>
+            </button>
+            {% endfor %}
+        </section>
+
+        {% for user in user_cards %}
+        <section class="audit-user-detail" id="audit-user-{{ user.user_id }}" hidden>
+            <div class="audit-user-detail__head">
+                <div>
+                    <h4 class="mb-0">{{ user.name }}</h4>
+                    <span class="text-muted">@{{ user.username }} · Generated {{ current_date.strftime('%d %B %Y') }}</span>
+                </div>
+                <div class="audit-user-detail__actions">
+                    <button type="button" class="btn btn-sm btn-primary" data-audit-print>
+                        <i class="bi bi-printer"></i> Print/Save
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" data-audit-close>
+                        <i class="bi bi-x-lg"></i> Close
+                    </button>
+                </div>
+            </div>
+            <div class="audit-user-detail__body">
+                <div class="audit-user-card__stats">
+                    <div>
+                        <span>Total logins</span>
+                        <strong>{{ user.total_logins }}</strong>
+                    </div>
+                    <div>
+                        <span>Last login</span>
+                        <strong>
+                            {% if user.last_login %}
+                            {{ user.last_login.strftime('%d %b %Y %H:%M') }}
+                            {% else %}
+                            Never
+                            {% endif %}
+                        </strong>
+                    </div>
+                    <div>
+                        <span>Total activities</span>
+                        <strong>{{ user.total_activities }}</strong>
+                    </div>
+                </div>
+                <h5 class="audit-user-card__activity-title">Recent activities</h5>
+                {% if user.activities %}
+                <ul class="audit-user-card__activity-list">
+                    {% for activity in user.activities %}
+                    <li>
+                        <div class="audit-user-card__activity-meta">
+                            <span>{{ activity.at.strftime('%d %b %Y %H:%M') }}</span>
+                            <span>{{ activity.category }} · {{ activity.type }}</span>
+                        </div>
+                        <p class="mb-0">{{ activity.description }}</p>
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <p class="report-empty mb-0">No activities logged for this user yet.</p>
+                {% endif %}
+            </div>
+        </section>
+        {% endfor %}
+        {% else %}
+        <p class="report-empty mb-0">No users were found for audit trail reporting.</p>
+        {% endif %}
+    </article>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+    const cards = document.querySelectorAll('[data-audit-target]');
+    const panels = document.querySelectorAll('.audit-user-detail');
+
+    function closeAll() {
+        panels.forEach(p => { p.hidden = true; });
+        cards.forEach(c => {
+            c.classList.remove('is-active');
+            c.setAttribute('aria-expanded', 'false');
+        });
+    }
+
+    cards.forEach(card => card.addEventListener('click', () => {
+        const panel = document.getElementById(card.dataset.auditTarget);
+        const wasOpen = !panel.hidden;
+        closeAll();
+        if (!wasOpen) {
+            panel.hidden = false;
+            card.classList.add('is-active');
+            card.setAttribute('aria-expanded', 'true');
+            panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+    }));
+
+    document.querySelectorAll('[data-audit-close]').forEach(b => b.addEventListener('click', closeAll));
+    document.querySelectorAll('[data-audit-print]').forEach(b => b.addEventListener('click', () => window.print()));
+})();
+</script>
+{% endblock %}

@@ -3,7 +3,12 @@ from datetime import date, timedelta
 from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
 from flask_login import login_required
 
-from services.report_service import build_report, month_segments, period_bounds
+from services.report_service import (
+    build_report,
+    build_user_audit_trails,
+    month_segments,
+    period_bounds,
+)
 from services.rbac import require_role
 
 
@@ -80,4 +85,15 @@ def index():
             for month_number in range(1, 13)
         ],
         current_date=today,
+    )
+
+
+@reports_bp.route('/audit-trails')
+@login_required
+@require_role('System Administrator')
+def audit_trails():
+    return render_template(
+        'admin/report_audit_trails.html',
+        user_cards=build_user_audit_trails(),
+        current_date=date.today(),
     )
