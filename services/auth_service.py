@@ -166,7 +166,8 @@ class AuthService:
 
     # ---------- Fingerprint verification (1:1) ----------
     @staticmethod
-    def verify_staff_fingerprint(user, probe_template, ip=None, user_agent=None):
+    def verify_staff_fingerprint(user, probe_template, ip=None, user_agent=None,
+                                 scanner_score=None):
         """
         Compare probe template against THIS user's stored template only (1:1).
         Returns (ok: bool, error: str | None, score: float).
@@ -175,8 +176,11 @@ class AuthService:
             return False, 'No fingerprint enrolled for this account.', 0.0
 
         try:
-            from services.biometric_matcher import compare_templates
-            score = compare_templates(probe_template, user.fingerprint_template)
+            if scanner_score is None:
+                from services.biometric_matcher import compare_templates
+                score = compare_templates(probe_template, user.fingerprint_template)
+            else:
+                score = float(scanner_score)
         except Exception as e:
             return False, f'Fingerprint comparison failed: {e}', 0.0
 

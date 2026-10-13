@@ -6,7 +6,8 @@ import base64
 import hashlib
 import logging
 from datetime import datetime
-from models import db, Inmate, Visitor, AuditEvent, BiometricEnrollment
+from extensions import db
+from models import Inmate, Visitor, AuditEvent
 
 class BiometricMatcher:
     """

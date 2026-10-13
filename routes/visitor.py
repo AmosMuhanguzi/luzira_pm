@@ -14,8 +14,10 @@ from extensions import csrf, db
 from services.rbac import require_permission, Permissions
 from services.visitor_service import VisitorService
 from services.visitor_matcher import VisitorMatcher
+from services.biometric_matcher import compare_templates_with_agent
 from services.biometric_agent_client import BiometricAgentClient, BiometricAgentError
 from services.person_photo_service import PersonPhotoService
+from services.biometric_service import BiometricEnrollmentService
 from models.visitor import Visitor, VisitorBlacklistEvent, VisitLog
 from models.inmate import Inmate
 
@@ -102,7 +104,21 @@ def api_scan_identify():
         return jsonify({'ok': False, 'error': probe.get('error', 'Scan failed')}), 400
 
     threshold = current_app.config.get('BIOMETRIC_MATCH_THRESHOLD', 75)
-    result = VisitorMatcher.identify(probe['template'], threshold=threshold)
+    try:
+        result = VisitorMatcher.identify(
+            probe['template'],
+            threshold=threshold,
+            comparator=compare_templates_with_agent,
+        )
+    except (BiometricAgentError, RuntimeError) as error:
+        return jsonify({'ok': False, 'error': str(error)}), 503
+
+    if not result['enrolled_count'] and result.get('comparison_errors'):
+        return jsonify({
+            'ok': False,
+            'error': 'No enrolled fingerprint templates could be compared. '
+                      'Recapture the affected records using the Mantra scanner.',
+        }), 503
 
     if result['match']:
         v = result['visitor']
@@ -275,6 +291,72 @@ def photo(visitor_id, filename):
         filename,
         mimetype='image/jpeg',
     )
+
+
+# ---------- Existing-record fingerprint capture ----------
+@visitor_bp.route('/<int:visitor_id>/fingerprint')
+@login_required
+@require_permission(Permissions.VISITOR_CREATE)
+def fingerprint_capture(visitor_id):
+    visitor = VisitorService.get(visitor_id)
+    if not visitor:
+        abort(404)
+    return render_template(
+        'visitor/fingerprint_capture.html',
+        person=visitor,
+        capture_url=url_for('visitor.capture_fingerprint', visitor_id=visitor_id),
+        back_url=url_for('visitor.detail', visitor_id=visitor_id),
+    )
+
+
+@visitor_bp.route('/<int:visitor_id>/fingerprint/capture', methods=['POST'])
+@login_required
+@require_permission(Permissions.VISITOR_CREATE)
+def capture_fingerprint(visitor_id):
+    visitor = VisitorService.get(visitor_id)
+    if not visitor:
+        return jsonify({'ok': False, 'error': 'Visitor not found.'}), 404
+    if _mock_mode():
+        return jsonify({
+            'ok': False,
+            'error': 'Existing-record capture requires the real Mantra scanner.',
+        }), 503
+
+    try:
+        probe = BiometricAgentClient(
+            current_app.config['BIOMETRIC_AGENT_URL'], timeout=25
+        ).enroll(
+            samples=current_app.config.get('BIOMETRIC_SAMPLES_PER_ENROLL', 3)
+        )
+    except BiometricAgentError as error:
+        return jsonify({'ok': False, 'error': str(error)}), 503
+
+    if not probe.get('success') or not probe.get('template'):
+        return jsonify({
+            'ok': False,
+            'error': probe.get('error', 'Fingerprint capture failed.'),
+        }), 400
+    try:
+        quality = float(probe['quality'])
+    except (KeyError, TypeError, ValueError):
+        return jsonify({'ok': False, 'error': 'The scanner did not report quality.'}), 400
+    minimum = current_app.config.get('BIOMETRIC_QUALITY_MIN', 60)
+    if not 0 <= quality <= 100 or quality < minimum:
+        return jsonify({
+            'ok': False,
+            'error': f'Fingerprint quality is too low ({quality:g}%). Try again.',
+        }), 400
+
+    try:
+        BiometricEnrollmentService.enroll_visitor(
+            visitor_id=visitor_id,
+            template=probe['template'],
+            quality_score=round(quality),
+            officer_id=current_user.user_id,
+        )
+    except ValueError as error:
+        return jsonify({'ok': False, 'error': str(error)}), 404
+    return jsonify({'ok': True, 'quality': round(quality)})
 
 
 # ---------- Visitor detail ----------

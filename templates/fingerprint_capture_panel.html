@@ -1,0 +1,45 @@
+<div class="row justify-content-center">
+    <div class="col-md-7 col-lg-5">
+        <div class="card shadow-sm border-0">
+            <div class="card-body text-center p-4">
+                <i class="bi bi-fingerprint text-primary" style="font-size: 5rem;"></i>
+                <h3 class="mt-3">Capture fingerprint</h3>
+                <p class="text-muted">
+                    Capture a real fingerprint for <strong>{{ person.full_name }}</strong>.
+                    This will replace any existing fingerprint for this record.
+                </p>
+                <div id="status" class="alert alert-info">
+                    Place the person's finger on the Mantra scanner, then start capture.
+                </div>
+                <button id="capture" type="button" class="btn btn-primary btn-lg">
+                    <i class="bi bi-fingerprint"></i> Capture fingerprint
+                </button>
+                <a href="{{ back_url }}" class="btn btn-outline-secondary btn-lg ms-2">Cancel</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+const captureButton = document.getElementById('capture');
+const statusBox = document.getElementById('status');
+captureButton.addEventListener('click', async () => {
+    captureButton.disabled = true;
+    statusBox.className = 'alert alert-info';
+    statusBox.textContent = 'Scanning… keep the finger steady.';
+    try {
+        const response = await fetch('{{ capture_url }}', {method: 'POST'});
+        const result = await response.json();
+        if (!response.ok || !result.ok) {
+            throw new Error(result.error || 'Fingerprint capture failed.');
+        }
+        statusBox.className = 'alert alert-success';
+        statusBox.textContent = `Fingerprint saved successfully (quality ${result.quality}%).`;
+        setTimeout(() => { window.location.href = '{{ back_url }}'; }, 900);
+    } catch (error) {
+        statusBox.className = 'alert alert-danger';
+        statusBox.textContent = error.message;
+        captureButton.disabled = false;
+    }
+});
+</script>

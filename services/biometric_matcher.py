@@ -7,6 +7,24 @@ In production, replace `compare_templates` with the SDK's matcher
 import base64
 
 
+def compare_templates_with_agent(template_a, template_b) -> float:
+    """Compare two templates using the connected scanner's SDK."""
+    from flask import current_app
+    from services.biometric_agent_client import BiometricAgentClient
+
+    def as_base64(value):
+        if isinstance(value, bytes):
+            return base64.b64encode(value).decode('ascii')
+        return value
+
+    result = BiometricAgentClient(
+        current_app.config['BIOMETRIC_AGENT_URL'], timeout=25
+    ).match(as_base64(template_a), as_base64(template_b))
+    if not result.get('success'):
+        raise RuntimeError(result.get('error', 'Hardware fingerprint matching failed.'))
+    return float(result['score'])
+
+
 def compare_templates(template_a, template_b) -> float:
     """
     Return a similarity score 0–100.

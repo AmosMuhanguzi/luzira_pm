@@ -490,6 +490,13 @@
                         Quality {{ inmate.biometric_quality_score }}
                     </div>
                 {% endif %}
+                {% if has_permission(Permissions.INMATE_CREATE) %}
+                <a href="{{ url_for('inmate.fingerprint_capture', inmate_id=inmate.inmate_id) }}"
+                   class="btn btn-outline-primary btn-sm mt-3">
+                    <i class="bi bi-fingerprint"></i>
+                    {{ 'Recapture fingerprint' if inmate.biometric_enrolled else 'Capture fingerprint' }}
+                </a>
+                {% endif %}
             </div>
         </div>
 

@@ -28,14 +28,14 @@ class BiometricAgentClient:
         try:
             with urllib.request.urlopen(req, timeout=self.timeout) as resp:
                 return json.loads(resp.read().decode('utf-8'))
-        except urllib.error.URLError as e:
-            raise BiometricAgentError(
-                f'Biometric agent unreachable at {url}: {e.reason}'
-            )
         except urllib.error.HTTPError as e:
             raise BiometricAgentError(
                 f'Agent returned HTTP {e.code}: '
                 f'{e.read().decode("utf-8", "replace")}'
+            )
+        except urllib.error.URLError as e:
+            raise BiometricAgentError(
+                f'Biometric agent unreachable at {url}: {e.reason}'
             )
 
     def scan(self) -> dict:
@@ -43,6 +43,12 @@ class BiometricAgentClient:
 
     def enroll(self, samples: int = 3) -> dict:
         return self._post('/api/enroll', {'samples': samples})
+
+    def match(self, probe_template, enrolled_template) -> dict:
+        return self._post('/api/match', {
+            'probe_template': probe_template,
+            'enrolled_template': enrolled_template,
+        })
 
     def status(self) -> dict:
         url = f'{self.base_url}/api/status'

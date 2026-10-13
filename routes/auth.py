@@ -7,6 +7,7 @@ from wtforms import StringField, PasswordField, BooleanField, SubmitField
 from wtforms.validators import DataRequired, Length, EqualTo
 
 from services.auth_service import AuthService
+from services.biometric_agent_client import BiometricAgentClient, BiometricAgentError
 from extensions import csrf
 
 
@@ -14,6 +15,15 @@ auth_bp = Blueprint('auth', __name__)
 
 # All auth routes use a pending-session token for state; exempt from CSRF
 csrf.exempt(auth_bp)
+
+
+def _login_uses_simulation(user):
+    """Return whether this account is allowed to use the synthetic scanner."""
+    roles = current_app.config.get('BIOMETRIC_LOGIN_SIMULATION_ROLES', ())
+    return (
+        current_app.config.get('BIOMETRIC_LOGIN_SIMULATION', False)
+        and user.role_name in roles
+    )
 
 
 # ---------- Forms ----------
@@ -85,7 +95,7 @@ def login_fingerprint():
         'auth/login_fingerprint.html',
         user=user,
         agent_url=current_app.config['BIOMETRIC_AGENT_URL'],
-        mock_mode=current_app.config['BIOMETRIC_MOCK_MODE'],
+        mock_mode=_login_uses_simulation(user),
         token=session['pending_login']['token'],
     )
 
@@ -102,7 +112,7 @@ def login_enroll():
         'auth/login_enroll.html',
         user=user,
         agent_url=current_app.config['BIOMETRIC_AGENT_URL'],
-        mock_mode=current_app.config['BIOMETRIC_MOCK_MODE'],
+        mock_mode=_login_uses_simulation(user),
         samples=current_app.config['BIOMETRIC_SAMPLES_PER_ENROLL'],
         token=session['pending_login']['token'],
     )
@@ -119,11 +129,33 @@ def api_verify_fingerprint():
     if not user:
         return jsonify({'ok': False, 'error': 'Session expired.'}), 401
 
+    scanner_score = None
+    if not _login_uses_simulation(user):
+        if not template:
+            return jsonify({'ok': False, 'error': 'No fingerprint was captured.'}), 400
+        try:
+            import base64
+            match = BiometricAgentClient(
+                current_app.config['BIOMETRIC_AGENT_URL'], timeout=25
+            ).match(
+                template,
+                base64.b64encode(user.fingerprint_template).decode('ascii'),
+            )
+            if not match.get('success'):
+                return jsonify({
+                    'ok': False,
+                    'error': match.get('error', 'Fingerprint matching failed.'),
+                }), 503
+            scanner_score = match.get('score')
+        except BiometricAgentError as error:
+            return jsonify({'ok': False, 'error': str(error)}), 503
+
     ok, error, score = AuthService.verify_staff_fingerprint(
         user=user,
         probe_template=template,
         ip=request.remote_addr,
         user_agent=request.headers.get('User-Agent'),
+        scanner_score=scanner_score,
     )
 
     if not ok:
@@ -165,7 +197,8 @@ def api_enroll_fingerprint():
 @auth_bp.route('/api/mock-scan', methods=['POST'])
 def api_mock_scan():
     """Dev-only: return a synthetic fingerprint template (no hardware needed)."""
-    if not current_app.config.get('BIOMETRIC_MOCK_MODE'):
+    user = AuthService.get_pending_user(session)
+    if not user or not _login_uses_simulation(user):
         return jsonify({'success': False, 'error': 'Mock mode disabled'}), 403
 
     import base64
@@ -182,7 +215,8 @@ def api_mock_scan():
 @auth_bp.route('/api/mock-enroll', methods=['POST'])
 def api_mock_enroll():
     """Dev-only: return a synthetic enrolment template."""
-    if not current_app.config.get('BIOMETRIC_MOCK_MODE'):
+    user = AuthService.get_pending_user(session)
+    if not user or not _login_uses_simulation(user):
         return jsonify({'success': False, 'error': 'Mock mode disabled'}), 403
 
     import base64

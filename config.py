@@ -47,9 +47,14 @@ class Config:
     BIOMETRIC_SAMPLES_PER_ENROLL = 3
     BIOMETRIC_AGENT_URL = 'http://127.0.0.1:5001'
 
-    # Set to True to bypass real hardware during development.
-    # The agent will return a synthetic template instead of reading a real finger.
-    BIOMETRIC_MOCK_MODE = os.environ.get('BIOMETRIC_MOCK_MODE', 'true').lower() == 'true'
+    # Hardware is the default for inmate, visitor, and staff operations.
+    BIOMETRIC_MOCK_MODE = os.environ.get('BIOMETRIC_MOCK_MODE', 'false').lower() == 'true'
+    # Keep only the legacy administrator login simulation as a separate,
+    # explicit compatibility switch.
+    BIOMETRIC_LOGIN_SIMULATION = os.environ.get(
+        'BIOMETRIC_LOGIN_SIMULATION', 'true'
+    ).lower() == 'true'
+    BIOMETRIC_LOGIN_SIMULATION_ROLES = ('System Administrator',)
 
     # How long a "password verified, waiting for fingerprint" session may live
     LOGIN_PENDING_TIMEOUT_SECONDS = 180   # 3 minutes

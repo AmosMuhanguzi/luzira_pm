@@ -32,9 +32,13 @@ from models.medical import (
 )
 from models.visit import VisitLog
 from models.user import UserAccount
-from services.biometric_matcher import compare_templates
+from services.biometric_matcher import (
+    compare_templates,
+    compare_templates_with_agent,
+)
 from services.person_photo_service import PersonPhotoService
 from services.medical_record_service import MedicalRecordService
+from services.biometric_service import BiometricEnrollmentService
 
 
 inmate_bp = Blueprint('inmate', __name__, url_prefix='/inmate')
@@ -506,7 +510,12 @@ def api_release_fingerprint():
             'error': f'Fingerprint quality is too low ({quality}%). Try again.',
         }), 400
 
-    score = compare_templates(probe['template'], inmate.fingerprint_template)
+    try:
+        score = compare_templates_with_agent(
+            probe['template'], inmate.fingerprint_template
+        )
+    except (BiometricAgentError, RuntimeError) as error:
+        return jsonify({'ok': False, 'error': str(error)}), 503
     threshold = current_app.config.get('BIOMETRIC_MATCH_THRESHOLD', 75)
     if score < threshold:
         session.pop('release_fingerprint_verified', None)
@@ -610,7 +619,12 @@ def work_transfer_action(inmate_id, action):
             'error': f'Fingerprint quality is too low ({quality:g}%). Try again.',
         }), 400
 
-    score = compare_templates(probe['template'], inmate.fingerprint_template)
+    try:
+        score = compare_templates_with_agent(
+            probe['template'], inmate.fingerprint_template
+        )
+    except (BiometricAgentError, RuntimeError) as error:
+        return jsonify({'ok': False, 'error': str(error)}), 503
     threshold = current_app.config.get('BIOMETRIC_MATCH_THRESHOLD', 75)
     if score < threshold:
         return jsonify({
@@ -820,7 +834,21 @@ def api_scan_identify():
     probe_template = probe['template']
     threshold = current_app.config.get('BIOMETRIC_MATCH_THRESHOLD', 75)
 
-    result = InmateMatcher.identify(probe_template, threshold=threshold)
+    try:
+        result = InmateMatcher.identify(
+            probe_template,
+            threshold=threshold,
+            comparator=compare_templates_with_agent,
+        )
+    except (BiometricAgentError, RuntimeError) as error:
+        return jsonify({'ok': False, 'error': str(error)}), 503
+
+    if not result['enrolled_count'] and result.get('comparison_errors'):
+        return jsonify({
+            'ok': False,
+            'error': 'No enrolled fingerprint templates could be compared. '
+                      'Recapture the affected records using the Mantra scanner.',
+        }), 503
 
     if result['match']:
         m = result['inmate']
@@ -1115,6 +1143,70 @@ def photo(inmate_id, filename):
         filename,
         mimetype='image/jpeg',
     )
+
+
+# ---------- Existing-record fingerprint capture ----------
+@inmate_bp.route('/<int:inmate_id>/fingerprint')
+@login_required
+@require_permission(Permissions.INMATE_CREATE)
+def fingerprint_capture(inmate_id):
+    inmate = InmateService.get(inmate_id)
+    if not inmate:
+        abort(404)
+    return render_template(
+        'inmate/fingerprint_capture.html',
+        person=inmate,
+        capture_url=url_for('inmate.capture_fingerprint', inmate_id=inmate_id),
+        back_url=url_for('inmate.detail', inmate_id=inmate_id),
+    )
+
+
+@inmate_bp.route('/<int:inmate_id>/fingerprint/capture', methods=['POST'])
+@login_required
+@require_permission(Permissions.INMATE_CREATE)
+def capture_fingerprint(inmate_id):
+    inmate = InmateService.get(inmate_id)
+    if not inmate:
+        return jsonify({'ok': False, 'error': 'Inmate not found.'}), 404
+    if _mock_mode():
+        return jsonify({
+            'ok': False,
+            'error': 'Existing-record capture requires the real Mantra scanner.',
+        }), 503
+
+    try:
+        probe = _agent().enroll(
+            samples=current_app.config.get('BIOMETRIC_SAMPLES_PER_ENROLL', 3)
+        )
+    except BiometricAgentError as error:
+        return jsonify({'ok': False, 'error': str(error)}), 503
+
+    if not probe.get('success') or not probe.get('template'):
+        return jsonify({
+            'ok': False,
+            'error': probe.get('error', 'Fingerprint capture failed.'),
+        }), 400
+    try:
+        quality = float(probe['quality'])
+    except (KeyError, TypeError, ValueError):
+        return jsonify({'ok': False, 'error': 'The scanner did not report quality.'}), 400
+    minimum = current_app.config.get('BIOMETRIC_QUALITY_MIN', 60)
+    if not 0 <= quality <= 100 or quality < minimum:
+        return jsonify({
+            'ok': False,
+            'error': f'Fingerprint quality is too low ({quality:g}%). Try again.',
+        }), 400
+
+    try:
+        BiometricEnrollmentService.enroll_inmate(
+            inmate_id=inmate_id,
+            template=probe['template'],
+            quality_score=round(quality),
+            officer_id=current_user.user_id,
+        )
+    except ValueError as error:
+        return jsonify({'ok': False, 'error': str(error)}), 404
+    return jsonify({'ok': True, 'quality': round(quality)})
 
 
 # ---------- Detail ----------
