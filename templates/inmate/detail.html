@@ -57,11 +57,12 @@
                     <dt class="col-sm-4">Date of birth</dt><dd class="col-sm-8">{{ inmate.date_of_birth }}</dd>
                     <dt class="col-sm-4">Age</dt><dd class="col-sm-8">{{ (inmate.age ~ ' years') if inmate.age is not none else '—' }}</dd>
                     <dt class="col-sm-4">Gender</dt><dd class="col-sm-8">{{ inmate.gender }}</dd>
+                    <dt class="col-sm-4">Marital status</dt><dd class="col-sm-8">{{ inmate.marital_status or '—' }}</dd>
                     <dt class="col-sm-4">Nationality</dt><dd class="col-sm-8">{{ inmate.nationality }}</dd>
                     <dt class="col-sm-4">Tribe</dt><dd class="col-sm-8">{{ inmate.tribe or '—' }}</dd>
                     <dt class="col-sm-4">Religion</dt><dd class="col-sm-8">{{ inmate.religion or '—' }}</dd>
                     <dt class="col-sm-4">Education</dt><dd class="col-sm-8">{{ inmate.education or '—' }}</dd>
-                    <dt class="col-sm-4">Height</dt><dd class="col-sm-8">{{ (inmate.height_cm ~ ' cm') if inmate.height_cm else '—' }}</dd>
+                    <dt class="col-sm-4">Height</dt><dd class="col-sm-8">{{ ('%.2f m'|format(inmate.height_cm / 100)) if inmate.height_cm is not none else '—' }}</dd>
                     <dt class="col-sm-4">Weight</dt><dd class="col-sm-8">{{ (inmate.weight_kg ~ ' kg') if inmate.weight_kg else '—' }}</dd>
                     <dt class="col-sm-4">Arrested from</dt><dd class="col-sm-8">{{ inmate.arrested_from or '—' }}</dd>
                     <dt class="col-sm-4">Description</dt><dd class="col-sm-8">{{ inmate.overall_description or '—' }}</dd>
@@ -105,6 +106,86 @@
                     {% endif %}
                 </dl>
             </div>
+        </div>
+
+        <div class="card shadow-sm border-0 mb-3">
+            <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+                <span><i class="bi bi-bag"></i> Inmate Property</span>
+                <span class="badge bg-light text-dark">{{ property_items|length }} in custody</span>
+            </div>
+            <div class="card-body p-0">
+                <table class="table table-sm mb-0 align-middle">
+                    <thead>
+                        <tr>
+                            <th style="width:3rem">#</th>
+                            <th>Item / property</th>
+                            <th>Description</th>
+                            {% if inmate.status == 'Active' and has_permission(Permissions.INMATE_RELEASE) %}<th class="d-print-none"></th>{% endif %}
+                        </tr>
+                    </thead>
+                    <tbody>
+                    {% for item in property_items %}
+                        <tr>
+                            <td>{{ loop.index }}</td>
+                            <td class="fw-semibold">{{ item.item_name }}</td>
+                            <td>{{ item.description or '—' }}</td>
+                            {% if inmate.status == 'Active' and has_permission(Permissions.INMATE_RELEASE) %}
+                            <td class="text-end d-print-none">
+                                <button class="btn btn-outline-primary btn-sm" type="button"
+                                        data-bs-toggle="collapse" data-bs-target="#handover{{ item.property_id }}">
+                                    <i class="bi bi-box-arrow-up-right"></i> Hand over
+                                </button>
+                            </td>
+                            {% endif %}
+                        </tr>
+                        {% if inmate.status == 'Active' and has_permission(Permissions.INMATE_RELEASE) %}
+                        <tr class="d-print-none">
+                            <td colspan="4" class="p-0 border-0">
+                                <div class="collapse" id="handover{{ item.property_id }}">
+                                    <form method="post" class="p-3 bg-light border-top"
+                                          action="{{ url_for('inmate.hand_over_property', inmate_id=inmate.inmate_id, property_id=item.property_id) }}">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                        <div class="row g-2">
+                                            <div class="col-md-5">
+                                                <label class="form-label small mb-1">Receiving person</label>
+                                                <input type="text" name="recipient" class="form-control form-control-sm" maxlength="150" required>
+                                            </div>
+                                            <div class="col-md-4">
+                                                <label class="form-label small mb-1">Relationship</label>
+                                                <input type="text" name="relationship" class="form-control form-control-sm" maxlength="80" placeholder="e.g. Brother">
+                                            </div>
+                                            <div class="col-md-3 d-flex align-items-end">
+                                                <button type="submit" class="btn btn-primary btn-sm w-100"
+                                                        onclick="return confirm('Hand this item over? It will be removed from the property list.')">Confirm handover</button>
+                                            </div>
+                                            <div class="col-12">
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="checkbox" name="authorized" id="auth{{ item.property_id }}" required>
+                                                    <label class="form-check-label small" for="auth{{ item.property_id }}">The inmate has authorised this handover.</label>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endif %}
+                    {% else %}
+                        <tr><td colspan="4" class="text-muted text-center py-3">None</td></tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% if has_permission(Permissions.INMATE_CREATE) and inmate.status == 'Active' %}
+            <div class="card-footer bg-white d-print-none">
+                <form method="post" class="row g-2" action="{{ url_for('inmate.add_property', inmate_id=inmate.inmate_id) }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <div class="col-md-4"><input type="text" name="property_item" class="form-control form-control-sm" maxlength="150" placeholder="Item / property" required></div>
+                    <div class="col-md-6"><input type="text" name="property_description" class="form-control form-control-sm" maxlength="2000" placeholder="Description"></div>
+                    <div class="col-md-2 d-grid"><button class="btn btn-outline-primary btn-sm" type="submit"><i class="bi bi-plus-circle"></i> Add item</button></div>
+                </form>
+            </div>
+            {% endif %}
         </div>
 
         <div class="card shadow-sm border-0">
@@ -330,7 +411,7 @@
                 {% if current_work_transfer %}
                 <p class="mb-2">
                     Currently out at <strong>{{ current_work_transfer.work_location }}</strong>
-                    since {{ current_work_transfer.checked_out_at.strftime('%Y-%m-%d %H:%M') }}.
+                    since {{ current_work_transfer.checked_out_at|facility_datetime }}.
                     Scan the inmate’s fingerprint to check them back in.
                 </p>
                 <form class="work-transfer-form"
@@ -380,9 +461,9 @@
                     <div>{{ transfer.work_description }}</div>
                     {% endif %}
                     <div class="small text-muted">
-                        Checked out: {{ transfer.checked_out_at.strftime('%Y-%m-%d %H:%M') }}
+                        Checked out: {{ transfer.checked_out_at|facility_datetime }}
                         {% if transfer.checked_in_at %}
-                        · Checked in: {{ transfer.checked_in_at.strftime('%Y-%m-%d %H:%M') }}
+                        · Checked in: {{ transfer.checked_in_at|facility_datetime }}
                         · Time out:
                             {% set minutes = transfer.time_out %}
                             {% if minutes >= 60 %}{{ minutes // 60 }}h {% endif %}{{ minutes % 60 }}m
@@ -669,7 +750,7 @@
                     — {{ r.change_count }} field(s) proposed
                     by {{ r.requestor.full_name if r.requestor else '—' }}
                 </div>
-                <small class="text-muted">{{ r.requested_at.strftime('%Y-%m-%d %H:%M') }}</small>
+                <small class="text-muted">{{ r.requested_at|facility_datetime }}</small>
             </div>
             {% if r.request_reason %}
             <div class="small text-muted">Reason: {{ r.request_reason }}</div>

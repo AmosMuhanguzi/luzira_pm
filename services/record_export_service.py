@@ -21,6 +21,7 @@ INMATE_EXPORT_FIELDS = (
     ('Aliases', 'alias_names'),
     ('Date of birth', 'date_of_birth'),
     ('Gender', 'gender'),
+    ('Marital status', 'marital_status'),
     ('Nationality', 'nationality'),
     ('Tribe', 'tribe'),
     ('Religion', 'religion'),

@@ -34,6 +34,7 @@
                 <div class="col-md-6"><strong>Status at discharge:</strong> {{ inmate.status }}</div>
                 <div class="col-md-6"><strong>Date of birth:</strong> {{ inmate.date_of_birth or '—' }}</div>
                 <div class="col-md-6"><strong>Gender:</strong> {{ inmate.gender or '—' }}</div>
+                <div class="col-md-6"><strong>Marital status:</strong> {{ inmate.marital_status or '—' }}</div>
                 <div class="col-md-6"><strong>Nationality:</strong> {{ inmate.nationality or '—' }}</div>
                 <div class="col-md-6"><strong>Tribe:</strong> {{ inmate.tribe or '—' }}</div>
                 <div class="col-md-6"><strong>Religion:</strong> {{ inmate.religion or '—' }}</div>
@@ -89,7 +90,7 @@
         <div class="col-md-6"><strong>Fingerprint enrolled:</strong> {{ 'Yes' if inmate.biometric_enrolled else 'No' }}</div>
         {% if inmate.biometric_enrolled %}
         <div class="col-md-6"><strong>Enrollment date:</strong>
-            {{ inmate.biometric_enrollment_date.strftime('%Y-%m-%d %H:%M') if inmate.biometric_enrollment_date else '—' }}
+            {{ inmate.biometric_enrollment_date|facility_datetime if inmate.biometric_enrollment_date else '—' }}
         </div>
         <div class="col-md-6"><strong>Enrollment quality:</strong> {{ inmate.biometric_quality_score if inmate.biometric_quality_score is not none else '—' }}</div>
         {% endif %}
@@ -139,7 +140,7 @@
                     <td>{{ admission.admission_date or '—' }}</td>
                     <td>{{ admission.admission_type or '—' }}{% if admission.admission_reason %}<br>{{ admission.admission_reason }}{% endif %}</td>
                     <td>{{ admission.releasing_facility or '—' }}</td>
-                    <td>{{ admission.released_at.strftime('%Y-%m-%d %H:%M') if admission.released_at else (admission.release_date or '—') }}</td>
+                    <td>{{ admission.released_at|facility_datetime if admission.released_at else (admission.release_date or '—') }}</td>
                     <td>{{ admission.release_type or '—' }}{% if admission.transfer_to %}<br>To: {{ admission.transfer_to }}{% endif %}</td>
                     <td>{{ admission.release_notes or '—' }}</td>
                     <td>UGX {{ '{:,.2f}'.format(admission.release_cash_amount or 0) }}<br>{{ admission.release_property_claims or 'No property notes' }}</td>
@@ -232,8 +233,8 @@
                 {% for transfer in work_transfer_logs %}
                 <tr>
                     <td>{{ transfer.work_location }}{% if transfer.work_description %}<br>{{ transfer.work_description }}{% endif %}</td>
-                    <td>{{ transfer.checked_out_at.strftime('%Y-%m-%d %H:%M') }}{% if transfer.checkout_officer %}<br>{{ transfer.checkout_officer.full_name }}{% endif %}</td>
-                    <td>{{ transfer.checked_in_at.strftime('%Y-%m-%d %H:%M') if transfer.checked_in_at else 'Still out' }}{% if transfer.checkin_officer %}<br>{{ transfer.checkin_officer.full_name }}{% endif %}</td>
+                    <td>{{ transfer.checked_out_at|facility_datetime }}{% if transfer.checkout_officer %}<br>{{ transfer.checkout_officer.full_name }}{% endif %}</td>
+                    <td>{{ transfer.checked_in_at|facility_datetime if transfer.checked_in_at else 'Still out' }}{% if transfer.checkin_officer %}<br>{{ transfer.checkin_officer.full_name }}{% endif %}</td>
                     <td>{% if transfer.time_out is not none %}{{ transfer.time_out }} minutes{% else %}In progress{% endif %}</td>
                     <td>Out: {{ '{:.2f}'.format(transfer.checkout_fingerprint_score) }}%
                         {% if transfer.checkin_fingerprint_score is not none %}<br>In: {{ '{:.2f}'.format(transfer.checkin_fingerprint_score) }}%{% endif %}
@@ -257,7 +258,7 @@
                 {% for visit in visit_logs %}
                 <tr>
                     <td>{{ visit.visitor.full_name if visit.visitor else 'Visitor record unavailable' }}</td>
-                    <td>{{ visit.check_in_time.strftime('%Y-%m-%d %H:%M') if visit.check_in_time else '—' }}<br>{{ visit.check_out_time.strftime('%Y-%m-%d %H:%M') if visit.check_out_time else 'Not checked out' }}</td>
+                    <td>{{ visit.check_in_time|facility_datetime if visit.check_in_time else '—' }}<br>{{ visit.check_out_time|facility_datetime if visit.check_out_time else 'Not checked out' }}</td>
                     <td>{{ visit.visit_type or '—' }}{% if visit.relationship %}<br>{{ visit.relationship }}{% endif %}</td>
                     <td>{{ visit.purpose_of_visit or '—' }}{% if visit.items_brought %}<br>Items: {{ visit.items_brought }}{% endif %}</td>
                     <td>{{ visit.display_status }}</td>
@@ -278,7 +279,7 @@
         <div class="col-6"><strong>Transferred to:</strong> {{ episode.transfer_to or '—' }}</div>
         {% endif %}
         <div class="col-6"><strong>Discharged at:</strong>
-            {{ episode.released_at.strftime('%Y-%m-%d %H:%M:%S') if episode.released_at else (episode.release_date or '—') }}
+            {{ episode.released_at|facility_datetime('%Y-%m-%d %H:%M:%S') if episode.released_at else (episode.release_date or '—') }}
             EAT
         </div>
         <div class="col-6"><strong>Cash/savings returned:</strong>

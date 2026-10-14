@@ -26,6 +26,50 @@
         </div>
     </div>
 
+    <div id="recentReleases" class="card border-0 shadow-sm mb-4">
+        <div class="card-header bg-white py-3">
+            <h5 class="mb-0"><i class="bi bi-clock-history text-primary me-2"></i>Recent release history</h5>
+        </div>
+        <div class="card-body">
+            {% if recent_releases %}
+            <div class="table-responsive">
+                <table class="table table-sm table-hover align-middle mb-0">
+                    <thead class="table-primary">
+                        <tr>
+                            <th>Inmate number</th>
+                            <th>Name</th>
+                            <th>Release date</th>
+                            <th>Type</th>
+                            <th>Destination / notes</th>
+                            <th>Released by</th>
+                            <th class="text-end"></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for release in recent_releases %}
+                        {% set profile_url = url_for('inmate.detail', inmate_id=release.inmate_id) %}
+                        <tr role="link" tabindex="0" style="cursor:pointer;"
+                            onclick="window.location.href='{{ profile_url }}'"
+                            onkeydown="if(event.key==='Enter'){window.location.href='{{ profile_url }}'}">
+                            <td><a class="fw-semibold text-primary text-decoration-none" href="{{ profile_url }}">{{ release.inmate_number or '—' }}</a></td>
+                            <td>{{ release.full_name or '—' }}</td>
+                            <td>{{ release.release_date.strftime('%d %b %Y') if release.release_date else '—' }}</td>
+                            <td><span class="badge bg-primary-subtle text-primary-emphasis">{{ release.release_type or '—' }}</span></td>
+                            <td>{{ release.transfer_to or '—' }}</td>
+                            <td>{{ release.releasing_officer or '—' }}</td>
+                            <td class="text-end text-primary"><i class="bi bi-chevron-right"></i></td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            <div class="form-text mt-2">Click an inmate to open their full profile.</div>
+            {% else %}
+            <p class="text-muted mb-0">No releases have been recorded yet.</p>
+            {% endif %}
+        </div>
+    </div>
+
     <section id="historySection" class="card border-0 shadow-sm mb-4" hidden>
         <div class="card-header bg-white py-3">
             <h5 class="mb-0"><span class="badge bg-info me-2">2</span> Inmate record and history</h5>
@@ -167,6 +211,7 @@
                     <div class="col-12">
                         {{ form.release_property_claims.label(class="form-label fw-semibold") }}
                         {{ form.release_property_claims(class="form-control" + (" is-invalid" if form.release_property_claims.errors else ""), rows="3", placeholder="List property returned, outstanding claims, or write “None”.") }}
+                        <div class="form-text">Filled automatically from the inmate’s property list (items already handed to relatives are excluded). You can edit it.</div>
                         {% for error in form.release_property_claims.errors %}
                         <div class="invalid-feedback">{{ error }}</div>
                         {% endfor %}
@@ -224,11 +269,18 @@ releaseType.addEventListener('change', updateTransferFields);
 transferPrison.addEventListener('change', updateTransferFields);
 updateTransferFields();
 
+function updateRecentReleases() {
+    const panel = document.getElementById('recentReleases');
+    if (!panel) return;
+    panel.hidden = searchInput.value.trim().length >= 2 || Boolean(selectedInmate);
+}
+
 searchInput.addEventListener('input', () => {
     window.clearTimeout(searchTimer);
     clearSelection();
     const query = searchInput.value.trim();
     searchResults.replaceChildren();
+    updateRecentReleases();
     if (query.length < 2) {
         searchStatus.textContent = 'Type at least 2 characters to search active inmates.';
         return;
@@ -262,6 +314,7 @@ async function searchInmates(query) {
 async function selectInmate(inmate) {
     clearSelection();
     selectedInmate = inmate;
+    updateRecentReleases();
     hiddenInmateId.value = inmate.inmate_id;
     searchInput.value = `${inmate.inmate_number} — ${inmate.full_name}`;
     searchResults.replaceChildren();
@@ -271,6 +324,7 @@ async function selectInmate(inmate) {
         if (!response.ok) throw new Error('Could not load this inmate’s history.');
         const history = await response.json();
         renderInmateSummary(history.inmate);
+        document.getElementById('release_property_claims').value = history.property_claims || 'None';
         renderRows('admissionHistoryBody', history.admissions, [
             ['Date', 'date'], ['Admission type', 'type'], ['Reason', 'reason'],
             ['Release date', 'release_date'], ['Release type', 'release_type'],
@@ -323,29 +377,29 @@ function renderInmateSummary(inmate) {
     const fields = [
         ['Name', inmate.full_name], ['Inmate number', inmate.inmate_number],
         ['Date of birth', inmate.date_of_birth], ['Gender', inmate.gender],
+        ['Marital status', inmate.marital_status],
         ['Nationality', inmate.nationality], ['Tribe', inmate.tribe],
         ['Religion', inmate.religion], ['National ID', inmate.national_id_number],
-        ['Passport', inmate.passport_number], ['Aliases', inmate.alias_names],
+        ['Education', inmate.education], ['Arrested from', inmate.arrested_from],
+        ['Height (m)', inmate.height_cm ? (inmate.height_cm / 100).toFixed(2) : null],
+        ['Weight (kg)', inmate.weight_kg],
+        ['Overall description', inmate.overall_description],
         ['Next of kin', inmate.next_of_kin_name],
         ['Next-of-kin relationship', inmate.next_of_kin_relationship],
         ['Next-of-kin phone', inmate.next_of_kin_phone],
         ['Next-of-kin phone 2', inmate.next_of_kin_phone_2],
         ['Next-of-kin address', inmate.next_of_kin_address],
-        ['Height (cm)', inmate.height_cm], ['Weight (kg)', inmate.weight_kg],
-        ['Eye color', inmate.eye_color], ['Hair color', inmate.hair_color],
-        ['Distinguishing marks', inmate.distinguishing_marks],
-        ['Offence', inmate.crime_category], ['Case number', inmate.court_case_number],
-        ['Court', inmate.sentencing_court], ['Sentence', inmate.sentence_type],
+        ['Offence category', inmate.crime_category],
+        ['Case number', inmate.court_case_number],
+        ['Offence status', inmate.sentence_type],
+        ['Offence description', inmate.crime_description],
         ['Sentence duration', inmate.sentence_duration],
-        ['Sentence start', inmate.sentence_start_date],
         ['Expected release', inmate.expected_release_date],
-        ['Current cell', [inmate.cell_block, inmate.cell_number].filter(Boolean).join(' / ')],
+        ['Next court date', inmate.next_court_date],
+        ['Cell block', inmate.cell_block], ['Cell number', inmate.cell_number],
         ['Security classification', inmate.security_classification],
-        ['Medical condition', inmate.has_medical_condition],
-        ['Medical alert', inmate.medical_alert], ['Risk level', inmate.risk_level],
-        ['Violence history', inmate.violence_history],
-        ['Escape-attempt history', inmate.escape_attempt_history],
-        ['Total admissions', inmate.total_admissions]
+        ['Medical condition', inmate.has_medical_condition ? 'Yes' : 'No'],
+        ['Medical alert', inmate.medical_alert]
     ];
     fields.forEach(([label, value]) => {
         const column = document.createElement('div');

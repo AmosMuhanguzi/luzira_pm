@@ -78,7 +78,7 @@
                         <span>Last login</span>
                         <strong>
                             {% if user.last_login %}
-                            {{ user.last_login.strftime('%d %b %Y %H:%M') }}
+                            {{ user.last_login|facility_datetime('%d %b %Y %H:%M') }}
                             {% else %}
                             Never
                             {% endif %}
@@ -95,7 +95,7 @@
                     {% for activity in user.activities %}
                     <li>
                         <div class="audit-user-card__activity-meta">
-                            <span>{{ activity.at.strftime('%d %b %Y %H:%M') }}</span>
+                            <span>{{ activity.at|facility_datetime('%d %b %Y %H:%M') }}</span>
                             <span>{{ activity.category }} · {{ activity.type }}</span>
                         </div>
                         <p class="mb-0">{{ activity.description }}</p>

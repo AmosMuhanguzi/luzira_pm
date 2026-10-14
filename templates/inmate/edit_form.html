@@ -62,6 +62,16 @@
                     </select>
                 </div>
                 <div class="col-md-3">
+                    <label class="form-label">Marital status</label>
+                    <select name="marital_status" class="form-select">
+                        <option value="">--</option>
+                        {% for status in ['Single', 'Married', 'Separated', 'Divorced', 'Widowed', 'Unknown'] %}
+                        <option value="{{ status }}"
+                            {{ 'selected' if (data.marital_status if data.marital_status is defined else inmate.marital_status) == status }}>{{ status }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3">
                     <label class="form-label">Nationality</label>
                     <input type="text" name="nationality" class="form-control"
                            value="{{ data.nationality or inmate.nationality }}">

@@ -47,7 +47,7 @@
                                 </h6>
                                 <p class="mb-1">{{ alert.message }}</p>
                                 <small class="text-muted">
-                                    <i class="fas fa-clock"></i> {{ alert.timestamp.strftime('%Y-%m-%d %H:%M') }}
+                                    <i class="fas fa-clock"></i> {{ alert.timestamp|facility_datetime }}
                                     {% if alert.related_entity %}
                                     | <i class="fas fa-link"></i> {{ alert.related_entity }}
                                     {% endif %}

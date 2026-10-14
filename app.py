@@ -1,5 +1,7 @@
 import os
 import importlib
+from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 from flask import Flask, app
 from extensions import db  # or wherever your db instance is defined
 from flask_migrate import Migrate
@@ -13,6 +15,17 @@ def create_app(config_name=None):
 
     app = Flask(__name__, instance_relative_config=True)
     app.config.from_object(config[config_name])
+
+    facility_timezone = ZoneInfo('Africa/Kampala')
+
+    def facility_datetime(value, fmt='%Y-%m-%d %H:%M'):
+        if value is None:
+            return ''
+        if value.tzinfo is None:
+            value = value.replace(tzinfo=timezone.utc)
+        return value.astimezone(facility_timezone).strftime(fmt)
+
+    app.jinja_env.filters['facility_datetime'] = facility_datetime
 
     os.makedirs(app.instance_path, exist_ok=True)
 

@@ -45,7 +45,7 @@
             <div class="card-body">
                 <dl class="row mb-0">
                     <dt class="col-sm-3">Type</dt><dd class="col-sm-9">{{ alert.analysis_type }}</dd>
-                    <dt class="col-sm-3">When</dt><dd class="col-sm-9">{{ alert.analysis_timestamp.strftime('%Y-%m-%d %H:%M') }}</dd>
+                    <dt class="col-sm-3">When</dt><dd class="col-sm-9">{{ alert.analysis_timestamp|facility_datetime }}</dd>
                     <dt class="col-sm-3">Target</dt>
                     <dd class="col-sm-9">
                         {{ alert.target_entity }}{% if alert.target_id %} #{{ alert.target_id }}{% endif %}
@@ -184,7 +184,7 @@
             <div class="card-body">
                 {% if alert.is_reviewed %}
                     <div class="alert alert-success small mb-0">
-                        Reviewed on {{ alert.reviewed_at.strftime('%Y-%m-%d %H:%M') }}
+                        Reviewed on {{ alert.reviewed_at|facility_datetime }}
                         {% if alert.review_notes %}<br>{{ alert.review_notes }}{% endif %}
                     </div>
                 {% else %}

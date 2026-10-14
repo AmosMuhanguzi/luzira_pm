@@ -125,7 +125,7 @@
                 {% for record in recent_medical_records %}
                 <tr>
                     <td class="small text-nowrap">
-                        {{ record.updated_at.strftime('%Y-%m-%d %H:%M') if record.updated_at else record.record_date }}
+                        {{ record.updated_at|facility_datetime if record.updated_at else record.record_date }}
                         {% if record.updated_at and record.created_at and record.updated_at > record.created_at %}
                         <span class="d-block text-muted">Updated</span>
                         {% else %}
@@ -328,7 +328,7 @@
                             </td>
                             <td>{{ transfer.work_location }}</td>
                             <td class="small text-nowrap">
-                                {{ transfer.checked_out_at.strftime('%Y-%m-%d %H:%M') if transfer.checked_out_at else '—' }}
+                                {{ transfer.checked_out_at|facility_datetime if transfer.checked_out_at else '—' }}
                             </td>
                             <td>
                                 {% if transfer.is_out %}
@@ -430,7 +430,7 @@
                 {% set incident_count = blacklist_incident_counts.get(event.visitor_id, 0) %}
                 <tr>
                     <td class="small text-nowrap">
-                        {{ event.event_at.strftime('%Y-%m-%d %H:%M') if event.event_at else '—' }}
+                        {{ event.event_at|facility_datetime if event.event_at else '—' }}
                         {% if event.actor %}
                         <span class="d-block text-muted">by {{ event.actor.full_name }}</span>
                         {% endif %}

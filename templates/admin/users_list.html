@@ -82,7 +82,7 @@
                         {% endif %}
                     </td>
                     <td class="small text-muted">
-                        {{ u.last_login.strftime('%Y-%m-%d %H:%M') if u.last_login else '—' }}
+                        {{ u.last_login|facility_datetime if u.last_login else '—' }}
                     </td>
                     <td class="text-end">
                         <div class="btn-group btn-group-sm">

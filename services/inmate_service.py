@@ -10,6 +10,7 @@ from models.cell import CellBlock
 from models.inmate import Inmate, AdmissionEpisode
 from models.audit import AuditEvent
 from services.medical_record_service import MedicalRecordService
+from services.inmate_property_service import InmatePropertyService
 from services.sentence import expected_release, parse_sentence, sentence_label
 
 
@@ -137,6 +138,23 @@ class InmateService:
         return Inmate.query.get(inmate_id)
 
     @staticmethod
+    def recent_releases(limit=5):
+        """Return the most recently completed release/transfer episodes."""
+        return (
+            AdmissionEpisode.query
+            .join(Inmate, Inmate.inmate_id == AdmissionEpisode.inmate_id)
+            .filter(AdmissionEpisode.is_current.is_(False))
+            .filter(AdmissionEpisode.release_date.isnot(None))
+            .order_by(
+                AdmissionEpisode.released_at.desc().nullslast(),
+                AdmissionEpisode.release_date.desc(),
+                AdmissionEpisode.episode_id.desc(),
+            )
+            .limit(limit)
+            .all()
+        )
+
+    @staticmethod
     def validate_legal_status(data):
         status = (data.get('sentence_type') or '').strip()
         if status == 'Remand':
@@ -209,6 +227,7 @@ class InmateService:
             full_name=data['full_name'].strip(),
             date_of_birth=dob,
             gender=data['gender'],
+            marital_status=(data.get('marital_status') or '').strip() or None,
             nationality=data['nationality'].strip(),
             tribe=data.get('tribe'),
             religion=data.get('religion'),
@@ -219,7 +238,7 @@ class InmateService:
             next_of_kin_phone_2=data.get('next_of_kin_phone_2'),
             next_of_kin_address=data.get('next_of_kin_address'),
             photo_path=data.get('photo_path'),
-            height_cm=_to_int(data.get('height_cm')),
+            height_cm=_height_cm_from_data(data),
             weight_kg=_to_int(data.get('weight_kg')),
             overall_description=data.get('overall_description'),
             education=data.get('education'),
@@ -270,6 +289,15 @@ class InmateService:
             is_current=True,
         )
         db.session.add(episode)
+        db.session.flush()
+        property_items = data.get('property_items') or []
+        property_error = InmatePropertyService.validate_items(property_items)
+        if property_error:
+            db.session.rollback()
+            return None, property_error
+        InmatePropertyService.add_items(
+            inmate.inmate_id, property_items, actor, episode.episode_id
+        )
         MedicalRecordService.add_prior_records(
             actor,
             inmate,
@@ -298,6 +326,7 @@ class InmateService:
         if legal_error:
             return None, legal_error
 
+        enrolled_template = None
         if fingerprint_template:
             try:
                 enrolled_template = _to_bytes(fingerprint_template)
@@ -327,7 +356,7 @@ class InmateService:
             'crime_category', 'crime_description', 'court_case_number',
             'sentence_type', 'sentence_duration', 'cell_number',
             'education', 'arrested_from', 'overall_description',
-            'tribe', 'religion',
+            'tribe', 'religion', 'marital_status',
             'security_classification', 'next_of_kin_name',
             'next_of_kin_relationship', 'next_of_kin_phone', 'next_of_kin_phone_2',
             'next_of_kin_address', 'medical_alert', 'photo_path',
@@ -342,9 +371,14 @@ class InmateService:
                 inmate.cell_block = new_cell_block
 
         for f in editable:
-            if f in data and data[f] not in (None, ''):
+            if f in data and data[f] is not None and (
+                data[f] != '' or f == 'marital_status'
+            ):
                 old = getattr(inmate, f)
-                new = data[f]
+                new = (
+                    (data[f] or '').strip() or None
+                    if f == 'marital_status' else data[f]
+                )
                 if str(old or '') != str(new):
                     changes.append(f'{f}: "{old}" -> "{new}"')
                     setattr(inmate, f, new)
@@ -374,6 +408,15 @@ class InmateService:
             is_current=True,
         )
         db.session.add(episode)
+        db.session.flush()
+        property_items = data.get('property_items') or []
+        property_error = InmatePropertyService.validate_items(property_items)
+        if property_error:
+            db.session.rollback()
+            return None, property_error
+        InmatePropertyService.add_items(
+            inmate.inmate_id, property_items, actor, episode.episode_id
+        )
         MedicalRecordService.add_prior_records(
             actor,
             inmate,
@@ -422,6 +465,20 @@ def _to_int(v):
         return int(v)
     except (ValueError, TypeError):
         return None
+
+
+def _height_cm_from_data(data):
+    """Store the form's metre value in the existing centimetre column."""
+    height_m = data.get('height_m')
+    if height_m not in (None, ''):
+        try:
+            value = float(height_m)
+            if value < 0:
+                return None
+            return round(value * 100)
+        except (TypeError, ValueError):
+            return None
+    return _to_int(data.get('height_cm'))
 
 
 def _to_bool(v):

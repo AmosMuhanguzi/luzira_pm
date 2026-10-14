@@ -190,7 +190,7 @@
                             <tbody>
                                 {% for event in recent_audit_events %}
                                 <tr>
-                                    <td>{{ event.timestamp.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+                                    <td>{{ event.timestamp|facility_datetime('%Y-%m-%d %H:%M:%S') }}</td>
                                     <td>{{ event.username }}</td>
                                     <td><span class="badge bg-secondary">{{ event.category }}</span></td>
                                     <td>{{ event.type }}</td>

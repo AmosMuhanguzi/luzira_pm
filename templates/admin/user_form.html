@@ -102,7 +102,7 @@
 <div class="alert alert-info small mt-3">
     <strong>Fingerprint status:</strong>
     {% if user.biometric_enrolled %}
-        Enrolled on {{ user.biometric_enrollment_date.strftime('%Y-%m-%d %H:%M') }}
+        Enrolled on {{ user.biometric_enrollment_date|facility_datetime }}
         (quality {{ user.biometric_quality_score }}).
         Use “Reset fingerprint” from the list to force re-enrolment.
     {% else %}

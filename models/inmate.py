@@ -15,6 +15,7 @@ class Inmate(BaseModel):
     alias_names   = db.Column(db.Text)            # JSON list as string
     date_of_birth = db.Column(db.Date, nullable=False)
     gender        = db.Column(db.String(10), nullable=False)
+    marital_status = db.Column(db.String(30))
     nationality   = db.Column(db.String(50), nullable=False)
     tribe         = db.Column(db.String(50))
     religion      = db.Column(db.String(50))
@@ -157,6 +158,7 @@ class Inmate(BaseModel):
             'alias_names': self.alias_names,
             'date_of_birth': self.date_of_birth.strftime('%Y-%m-%d') if self.date_of_birth else None,
             'gender': self.gender,
+            'marital_status': self.marital_status,
             'nationality': self.nationality,
             'tribe': self.tribe,
             'religion': self.religion,
@@ -227,3 +229,37 @@ class AdmissionEpisode(BaseModel):
 
     def __repr__(self):
         return f'<Episode {self.episode_id} inmate={self.inmate_id} type={self.admission_type}>'
+
+
+class InmateProperty(BaseModel):
+    """Item/property an inmate was arrested with and that is held in custody."""
+    __tablename__ = 'inmate_properties'
+
+    STATUS_IN_CUSTODY = 'In custody'
+    STATUS_HANDED_OVER = 'Handed over'
+    STATUS_RETURNED = 'Returned on release'
+
+    property_id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    inmate_id = db.Column(
+        db.Integer, db.ForeignKey('inmates.inmate_id'), nullable=False, index=True
+    )
+    episode_id = db.Column(db.Integer, db.ForeignKey('admission_episodes.episode_id'))
+    item_name = db.Column(db.String(150), nullable=False)
+    description = db.Column(db.Text)
+    status = db.Column(
+        db.String(30), nullable=False, default=STATUS_IN_CUSTODY, index=True
+    )
+    recorded_by = db.Column(db.Integer, db.ForeignKey('user_accounts.user_id'))
+
+    handed_to_name = db.Column(db.String(150))
+    handed_to_relationship = db.Column(db.String(80))
+    handed_over_at = db.Column(db.DateTime)
+    handed_over_by = db.Column(db.Integer, db.ForeignKey('user_accounts.user_id'))
+
+    inmate = db.relationship(
+        'Inmate',
+        backref=db.backref('properties', lazy='dynamic'),
+    )
+
+    def __repr__(self):
+        return f'<InmateProperty {self.property_id} inmate={self.inmate_id} {self.item_name}>'

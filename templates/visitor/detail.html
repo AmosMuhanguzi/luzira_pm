@@ -61,7 +61,7 @@
     <i class="bi bi-slash-circle"></i>
     <strong>Blacklisted:</strong> {{ visitor.blacklist_reason or 'No reason given.' }}
     <span class="d-block small mt-1">
-        Since {{ visitor.blacklist_date.strftime('%Y-%m-%d %H:%M') if visitor.blacklist_date else '—' }}
+        Since {{ visitor.blacklist_date|facility_datetime if visitor.blacklist_date else '—' }}
         · Blocking incident {{ blacklist_incident_count }} of {{ permanent_blacklist_threshold }}
         {% if blacklist_incident_count >= permanent_blacklist_threshold %}
         · <strong>Permanent — cannot be cleared</strong>
@@ -91,7 +91,7 @@
             <tbody>
                 {% for event in blacklist_events %}
                 <tr>
-                    <td class="text-nowrap">{{ event.event_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                    <td class="text-nowrap">{{ event.event_at|facility_datetime }}</td>
                     <td>
                         {% if event.action == 'Blocked' %}
                         <span class="badge bg-danger">Blocked</span>

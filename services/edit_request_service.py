@@ -16,7 +16,8 @@ from services.sentence import parse_sentence, sentence_label, expected_release
 # Fields that can be edited and their type (for coercion on apply)
 INMATE_EDITABLE_FIELDS = {
     'full_name': str, 'date_of_birth': 'date', 'gender': str, 'nationality': str,
-    'tribe': str, 'religion': str, 'national_id_number': str,
+    'marital_status': str, 'tribe': str, 'religion': str,
+    'national_id_number': str,
     'next_of_kin_name': str, 'next_of_kin_relationship': str,
     'next_of_kin_phone': str, 'next_of_kin_phone_2': str, 'next_of_kin_address': str,
     'height_cm': int, 'weight_kg': int,

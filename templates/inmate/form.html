@@ -63,6 +63,16 @@
                     </select>
                 </div>
                 <div class="col-md-3">
+                    <label class="form-label">Marital status</label>
+                    <select name="marital_status" class="form-select">
+                        <option value="">--</option>
+                        {% for status in ['Single', 'Married', 'Separated', 'Divorced', 'Widowed', 'Unknown'] %}
+                        <option value="{{ status }}"
+                            {{ 'selected' if (data.marital_status if data.marital_status is defined else (inmate.marital_status if editing else '')) == status }}>{{ status }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3">
                     <label class="form-label">Nationality *</label>
                     <input type="text" name="nationality" class="form-control" required
                            value="{{ data.nationality or (inmate.nationality if editing else 'Ugandan') }}">
@@ -99,9 +109,9 @@
                            value="{{ data.arrested_from or (inmate.arrested_from if editing else '') }}">
                 </div>
                 <div class="col-md-3">
-                    <label class="form-label">Height (cm)</label>
-                    <input type="number" name="height_cm" class="form-control" min="0"
-                           value="{{ data.height_cm or (inmate.height_cm if editing else '') }}">
+                    <label class="form-label">Height (m)</label>
+                    <input type="number" name="height_m" class="form-control" min="0" step="0.01"
+                           value="{{ data.height_m or ((inmate.height_cm / 100)|round(2) if editing and inmate.height_cm is not none else '') }}">
                 </div>
                 <div class="col-md-3">
                     <label class="form-label">Weight (kg)</label>
@@ -272,6 +282,54 @@
             </div>
         </div>
     </div>
+
+    <div class="card shadow-sm border-0 mb-3">
+        <div class="card-header bg-dark text-white"><i class="bi bi-bag"></i> Items / property on arrest</div>
+        <div class="card-body">
+            <p class="text-muted small mb-2">Record each item the person was arrested with. Leave empty if there is none — it will show as “None”.</p>
+            <div id="propertyRows">
+                {% for item in (data.property_items or []) %}
+                <div class="row g-2 mb-2 property-row">
+                    <div class="col-md-4">
+                        <input type="text" name="property_item" class="form-control" maxlength="150"
+                               placeholder="Item / property" value="{{ item.item_name }}">
+                    </div>
+                    <div class="col-md-7">
+                        <input type="text" name="property_description" class="form-control" maxlength="2000"
+                               placeholder="Description" value="{{ item.description }}">
+                    </div>
+                    <div class="col-md-1 d-grid">
+                        <button type="button" class="btn btn-outline-danger remove-property" aria-label="Remove item"><i class="bi bi-trash"></i></button>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            <button type="button" id="addPropertyRow" class="btn btn-outline-primary btn-sm">
+                <i class="bi bi-plus-circle"></i> Add another item
+            </button>
+        </div>
+    </div>
+    <script>
+    (function () {
+        const rows = document.getElementById('propertyRows');
+        function addRow() {
+            const row = document.createElement('div');
+            row.className = 'row g-2 mb-2 property-row';
+            row.innerHTML =
+                '<div class="col-md-4"><input type="text" name="property_item" class="form-control" maxlength="150" placeholder="Item / property"></div>' +
+                '<div class="col-md-7"><input type="text" name="property_description" class="form-control" maxlength="2000" placeholder="Description"></div>' +
+                '<div class="col-md-1 d-grid"><button type="button" class="btn btn-outline-danger remove-property" aria-label="Remove item"><i class="bi bi-trash"></i></button></div>';
+            rows.append(row);
+            return row;
+        }
+        document.getElementById('addPropertyRow').addEventListener('click', () => addRow().querySelector('input').focus());
+        rows.addEventListener('click', event => {
+            const button = event.target.closest('.remove-property');
+            if (button) button.closest('.property-row').remove();
+        });
+        if (!rows.children.length) addRow();
+    })();
+    </script>
 
     <div class="card shadow-sm border-0 mb-3">
         <div class="card-header bg-dark text-white"><i class="bi bi-heart-pulse"></i> Medical</div>

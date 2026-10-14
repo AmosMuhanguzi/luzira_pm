@@ -5,7 +5,7 @@ Import order matters: tables with no FK dependencies must be imported first.
 from models.base import BaseModel, TimestampMixin, SerializableMixin
 
 from models.user import Role, UserAccount
-from models.inmate import Inmate, AdmissionEpisode
+from models.inmate import Inmate, AdmissionEpisode, InmateProperty
 from models.visitor import Visitor, VisitorBlacklistEvent
 from models.visit import VisitLog
 from models.medical import (
@@ -20,7 +20,7 @@ from models.edit_request import EditRequest
 __all__ = [
     'BaseModel', 'TimestampMixin', 'SerializableMixin',
     'Role', 'UserAccount',
-    'Inmate', 'AdmissionEpisode',
+    'Inmate', 'AdmissionEpisode', 'InmateProperty',
     'Visitor', 'VisitorBlacklistEvent', 'VisitLog',
     'MedicalRecord', 'MedicalRecordAttachment', 'DisciplinaryLog', 'EscapeAttemptLog',
     'WorkTransferLog',

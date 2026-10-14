@@ -25,7 +25,7 @@
             <dt class="col-5">Visit type</dt>
             <dd class="col-7">{{ visit.visit_type }}</dd>
             <dt class="col-5">Check-in time</dt>
-            <dd class="col-7">{{ visit.check_in_time.strftime('%Y-%m-%d %H:%M') }}</dd>
+            <dd class="col-7">{{ visit.check_in_time|facility_datetime }}</dd>
             <dt class="col-5">Items</dt>
             <dd class="col-7">{{ visit.items_brought or '—' }}</dd>
         </dl>

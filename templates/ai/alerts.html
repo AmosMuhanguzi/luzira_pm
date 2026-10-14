@@ -43,7 +43,7 @@
             {% for a in alerts %}
                 <tr>
                     <td>#{{ a.analysis_id }}</td>
-                    <td class="small text-muted">{{ a.analysis_timestamp.strftime('%Y-%m-%d %H:%M') }}</td>
+                    <td class="small text-muted">{{ a.analysis_timestamp|facility_datetime }}</td>
                     <td>{{ a.analysis_type }}</td>
                     <td>{{ a.target_entity }}{% if a.target_id %} #{{ a.target_id }}{% endif %}</td>
                     <td>

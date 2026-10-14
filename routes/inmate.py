@@ -23,6 +23,7 @@ from extensions import csrf, db
 from models.cell import CellBlock
 from services.rbac import require_permission, Permissions, has_permission
 from services.inmate_service import InmateService
+from services.inmate_property_service import InmatePropertyService
 from services.inmate_matcher import InmateMatcher
 from services.biometric_agent_client import BiometricAgentClient, BiometricAgentError
 from models.inmate import AdmissionEpisode, Inmate
@@ -39,6 +40,8 @@ from services.biometric_matcher import (
 from services.person_photo_service import PersonPhotoService
 from services.medical_record_service import MedicalRecordService
 from services.biometric_service import BiometricEnrollmentService
+
+FACILITY_TIMEZONE = ZoneInfo('Africa/Kampala')
 
 
 inmate_bp = Blueprint('inmate', __name__, url_prefix='/inmate')
@@ -102,11 +105,43 @@ def _mock_mode():
     return current_app.config.get('BIOMETRIC_MOCK_MODE', False)
 
 
+def _facility_datetime(value):
+    if value is None:
+        return None
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=timezone.utc)
+    return value.astimezone(FACILITY_TIMEZONE).isoformat(sep=' ', timespec='minutes')
+
+
+def _recent_release_history(limit=5):
+    """Build display-ready rows for the most recent releases/transfers."""
+    episodes = InmateService.recent_releases(limit=limit)
+    officer_ids = {e.releasing_officer_id for e in episodes if e.releasing_officer_id}
+    officers = {
+        u.user_id: u.full_name
+        for u in UserAccount.query.filter(UserAccount.user_id.in_(officer_ids)).all()
+    } if officer_ids else {}
+    rows = []
+    for episode in episodes:
+        rows.append({
+            'episode_id': episode.episode_id,
+            'inmate_id': episode.inmate_id,
+            'inmate_number': episode.inmate.inmate_number if episode.inmate else None,
+            'full_name': episode.inmate.full_name if episode.inmate else None,
+            'release_date': episode.release_date,
+            'release_type': episode.release_type,
+            'transfer_to': episode.transfer_to,
+            'releasing_officer': officers.get(episode.releasing_officer_id),
+        })
+    return rows
+
+
 @inmate_bp.route('/release', methods=['GET', 'POST'])
 @login_required
 @require_permission(Permissions.INMATE_RELEASE)
 def release_form():
     form = InmateReleaseForm()
+    recent_releases = _recent_release_history()
     if form.validate_on_submit():
         try:
             selected_inmate_id = int(form.inmate_id.data)
@@ -119,6 +154,7 @@ def release_form():
                 'inmate/release.html',
                 form=form,
                 transfer_prisons=TRANSFER_PRISONS,
+                recent_releases=recent_releases,
             )
 
         scan_proof = session.get('release_fingerprint_verified')
@@ -129,6 +165,7 @@ def release_form():
                 form=form,
                 selected_inmate_id=inmate.inmate_id,
                 transfer_prisons=TRANSFER_PRISONS,
+                recent_releases=recent_releases,
             )
 
         discharged_at = datetime.now(ZoneInfo('Africa/Kampala')).replace(tzinfo=None)
@@ -158,6 +195,7 @@ def release_form():
                     form=form,
                     selected_inmate_id=inmate.inmate_id,
                     transfer_prisons=TRANSFER_PRISONS,
+                    recent_releases=recent_releases,
                 )
         elif (
             request.form.get('transfer_prison')
@@ -169,6 +207,7 @@ def release_form():
                 form=form,
                 selected_inmate_id=inmate.inmate_id,
                 transfer_prisons=TRANSFER_PRISONS,
+                recent_releases=recent_releases,
             )
 
         open_work_transfer = WorkTransferLog.query.filter_by(
@@ -185,6 +224,7 @@ def release_form():
                 form=form,
                 selected_inmate_id=inmate.inmate_id,
                 transfer_prisons=TRANSFER_PRISONS,
+                recent_releases=recent_releases,
             )
 
         episode = inmate.admission_episodes.filter_by(is_current=True).first()
@@ -218,6 +258,7 @@ def release_form():
         inmate.status = 'Transferred' if release_type == 'Transfer' else 'Released'
         inmate.cell_block = None
         inmate.cell_number = None
+        InmatePropertyService.mark_returned_on_release(inmate.inmate_id, current_user)
 
         AuditEvent.log_event(
             event_category='Inmate',
@@ -258,6 +299,7 @@ def release_form():
         'inmate/release.html',
         form=form,
         transfer_prisons=TRANSFER_PRISONS,
+        recent_releases=recent_releases,
     )
 
 
@@ -346,6 +388,7 @@ def api_release_history(inmate_id):
             'full_name': inmate.full_name,
             'date_of_birth': inmate.date_of_birth.isoformat() if inmate.date_of_birth else None,
             'gender': inmate.gender,
+            'marital_status': inmate.marital_status,
             'nationality': inmate.nationality,
             'tribe': inmate.tribe,
             'religion': inmate.religion,
@@ -390,6 +433,7 @@ def api_release_history(inmate_id):
             'total_admissions': inmate.total_admissions,
             'biometric_enrolled': bool(inmate.biometric_enrolled and inmate.fingerprint_template),
         },
+        'property_claims': InmatePropertyService.claims_text(inmate.inmate_id),
         'admissions': [{
             'date': episode.admission_date.isoformat() if episode.admission_date else None,
             'type': episode.admission_type,
@@ -441,9 +485,9 @@ def api_release_history(inmate_id):
         'work_transfer_history': [{
             'location': log.work_location,
             'description': log.work_description,
-            'checked_out_at': log.checked_out_at.isoformat(sep=' ', timespec='minutes'),
+            'checked_out_at': _facility_datetime(log.checked_out_at),
             'checked_in_at': (
-                log.checked_in_at.isoformat(sep=' ', timespec='minutes')
+                _facility_datetime(log.checked_in_at)
                 if log.checked_in_at else None
             ),
             'status': 'Out for work' if log.is_out else 'Inside',
@@ -633,7 +677,7 @@ def work_transfer_action(inmate_id, action):
             'error': 'Scanned fingerprint does not match the selected inmate.',
         }), 403
 
-    action_at = datetime.now(ZoneInfo('Africa/Kampala')).replace(tzinfo=None)
+    action_at = datetime.now(timezone.utc).replace(tzinfo=None)
     if action == 'checkout':
         transfer = WorkTransferLog(
             inmate_id=inmate.inmate_id,
@@ -954,6 +998,7 @@ def api_enroll_fingerprint():
 def new_intake():
     if request.method == 'POST':
         data = request.form.to_dict()
+        data['property_items'] = InmatePropertyService.parse_form_items(request.form)
         data['prior_medical_summary'] = request.form.get('prior_medical_summary', '')
         document_path, document_name, document_error = MedicalRecordService.save_document(
             request.files.get('prior_medical_document'),
@@ -1060,6 +1105,7 @@ def readmit(inmate_id):
 
     if request.method == 'POST':
         data = request.form.to_dict()
+        data['property_items'] = InmatePropertyService.parse_form_items(request.form)
         data['prior_medical_summary'] = request.form.get('prior_medical_summary', '')
         document_path, document_name, document_error = MedicalRecordService.save_document(
             request.files.get('prior_medical_document'),
@@ -1277,6 +1323,7 @@ def detail(inmate_id):
 
     return render_template('inmate/detail.html',
                            inmate=inmate, episodes=episodes,
+                           property_items=InmatePropertyService.in_custody(inmate_id),
                            disciplinary_logs=disciplinary_logs,
                            escape_attempt_logs=escape_attempt_logs,
                            work_transfer_logs=work_transfer_logs,
@@ -1286,6 +1333,69 @@ def detail(inmate_id):
                            medical_records=medical_records,
                            isolation_cell_blocks=isolation_cell_blocks,
                            medical_isolation_form=medical_isolation_form)
+
+
+@inmate_bp.route('/<int:inmate_id>/property', methods=['POST'])
+@login_required
+@require_permission(Permissions.INMATE_CREATE)
+def add_property(inmate_id):
+    inmate = InmateService.get(inmate_id)
+    if not inmate:
+        abort(404)
+    items = InmatePropertyService.parse_form_items(request.form)
+    error = InmatePropertyService.validate_items(items) or (
+        None if items else 'Enter at least one item.'
+    )
+    if error:
+        flash(error, 'danger')
+        return redirect(url_for('inmate.detail', inmate_id=inmate_id))
+    episode = inmate.current_episode()
+    InmatePropertyService.add_items(
+        inmate_id, items, current_user,
+        episode.episode_id if episode else None,
+    )
+    db.session.commit()
+    flash(f'{len(items)} property item(s) recorded.', 'success')
+    return redirect(url_for('inmate.detail', inmate_id=inmate_id))
+
+
+@inmate_bp.route('/<int:inmate_id>/property/<int:property_id>/hand-over', methods=['POST'])
+@login_required
+@require_permission(Permissions.INMATE_RELEASE)
+def hand_over_property(inmate_id, property_id):
+    inmate = InmateService.get(inmate_id)
+    if not inmate:
+        abort(404)
+    if request.form.get('authorized') != 'on':
+        flash('Confirm that the inmate authorised this handover.', 'danger')
+        return redirect(url_for('inmate.detail', inmate_id=inmate_id))
+    item, error = InmatePropertyService.hand_over(
+        current_user, property_id, inmate_id,
+        request.form.get('recipient'), request.form.get('relationship'),
+    )
+    if error:
+        flash(error, 'danger')
+        return redirect(url_for('inmate.detail', inmate_id=inmate_id))
+    AuditEvent.log_event(
+        event_category='Inmate',
+        event_type='Property Handover',
+        event_description=(
+            f'Handed over "{item.item_name}" of {inmate.inmate_number} '
+            f'to {item.handed_to_name}'
+            + (f' ({item.handed_to_relationship})' if item.handed_to_relationship else '')
+            + ' with the inmate’s authorisation'
+        ),
+        entity_type='Inmate',
+        entity_id=inmate.inmate_id,
+        user_id=current_user.user_id,
+        username=current_user.username,
+        user_role=current_user.role_name,
+        ip_address=request.remote_addr,
+        user_agent=request.headers.get('User-Agent'),
+    )
+    db.session.commit()
+    flash(f'"{item.item_name}" was handed over and removed from the property list.', 'success')
+    return redirect(url_for('inmate.detail', inmate_id=inmate_id))
 
 
 @inmate_bp.route('/<int:inmate_id>/medical-isolation', methods=['POST'])
