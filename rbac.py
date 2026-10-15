@@ -108,6 +108,17 @@ ROLE_PERMISSIONS = {
     ]
 }
 
+ROLE_PERMISSIONS['Admin'] = [
+    permission for permission in ROLE_PERMISSIONS['System Administrator']
+    if permission not in {
+        Permissions.USER_VIEW,
+        Permissions.USER_CREATE,
+        Permissions.USER_EDIT,
+        Permissions.USER_DELETE,
+        Permissions.USER_RESET_PASSWORD,
+    }
+]
+
 
 def has_permission(permission):
     """

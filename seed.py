@@ -17,7 +17,8 @@ def seed():
 
         # ---- Roles ----
         roles_data = [
-            ('System Administrator', 'Full system access and configuration'),
+            ('System Administrator', 'Full system access and configuration, including staff account management'),
+            ('Admin',                'Full operational access except staff account management'),
             ('Warden',               'Read-only + AI analytics dashboard + approvals'),
             ('Records Officer',      'Inmate records management'),
             ('Receptionist',         'Intake processing and visitor management'),

@@ -271,7 +271,7 @@ def user_delete(user_id):
 
 @admin_bp.route('/cells', methods=['GET', 'POST'])
 @login_required
-@require_role('System Administrator')
+@require_role('System Administrator', 'Admin')
 def cells():
     form = CellBlockForm()
 
@@ -351,7 +351,7 @@ def cells():
 
 @admin_bp.route('/cells/<int:cell_id>/classification', methods=['POST'])
 @login_required
-@require_role('System Administrator')
+@require_role('System Administrator', 'Admin')
 def cell_classification(cell_id):
     form = CellClassificationForm()
     if not form.validate_on_submit():
@@ -408,7 +408,7 @@ def cell_classification(cell_id):
 
 @admin_bp.route('/cells/<int:cell_id>/medical-isolation', methods=['POST'])
 @login_required
-@require_role('System Administrator')
+@require_role('System Administrator', 'Admin')
 def cell_medical_isolation(cell_id):
     form = CellMedicalIsolationForm()
     if not form.validate_on_submit():
@@ -473,7 +473,7 @@ def cell_medical_isolation(cell_id):
 
 @admin_bp.route('/cells/<int:cell_id>/delete', methods=['POST'])
 @login_required
-@require_role('System Administrator')
+@require_role('System Administrator', 'Admin')
 def cell_delete(cell_id):
     form = CellDeleteForm()
     if not form.validate_on_submit():

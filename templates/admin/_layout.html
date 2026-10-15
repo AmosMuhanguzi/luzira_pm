@@ -6,16 +6,20 @@
     <!-- Sidebar -->
     <div class="col-md-3 col-lg-2 mb-3">
         <div class="list-group shadow-sm">
+            {% if has_permission(Permissions.USER_VIEW) %}
             <a href="{{ url_for('admin.users_list') }}"
                class="list-group-item list-group-item-action
                       {{ 'active' if request.endpoint == 'admin.users_list' }}">
                 <img class="staff-icon" src="{{ url_for('static', filename='images/staff-icon.png') }}" alt=""> Staff Users
             </a>
+            {% endif %}
+            {% if has_permission(Permissions.USER_CREATE) %}
             <a href="{{ url_for('admin.user_new') }}"
                class="list-group-item list-group-item-action
                       {{ 'active' if request.endpoint == 'admin.user_new' }}">
                 <i class="bi bi-person-plus"></i> Add User
             </a>
+            {% endif %}
             <a href="{{ url_for('admin.cells') }}"
                class="list-group-item list-group-item-action
                       {{ 'active' if request.endpoint in ['admin.cells', 'admin.cell_delete'] }}">

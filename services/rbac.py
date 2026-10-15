@@ -138,6 +138,19 @@ ROLE_PERMISSIONS = {
     ],
 }
 
+ADMIN_ROLES = ('System Administrator', 'Admin')
+_STAFF_MANAGEMENT_PERMISSIONS = {
+    Permissions.USER_VIEW,
+    Permissions.USER_CREATE,
+    Permissions.USER_EDIT,
+    Permissions.USER_DELETE,
+    Permissions.USER_RESET_PASSWORD,
+}
+ROLE_PERMISSIONS['Admin'] = [
+    permission for permission in ROLE_PERMISSIONS['System Administrator']
+    if permission not in _STAFF_MANAGEMENT_PERMISSIONS
+]
+
 
 def has_permission(permission: str) -> bool:
     """Check if the currently logged-in user has a permission."""

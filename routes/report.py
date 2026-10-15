@@ -19,7 +19,7 @@ REPORT_TYPES = {'weekly', 'monthly', 'quarterly', 'yearly'}
 
 @reports_bp.route('/')
 @login_required
-@require_role('System Administrator')
+@require_role('System Administrator', 'Admin')
 def index():
     today = date.today()
     report_type = request.args.get('type', 'weekly')
@@ -90,7 +90,7 @@ def index():
 
 @reports_bp.route('/audit-trails')
 @login_required
-@require_role('System Administrator')
+@require_role('System Administrator', 'Admin')
 def audit_trails():
     return render_template(
         'admin/report_audit_trails.html',

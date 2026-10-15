@@ -30,9 +30,7 @@
     <div class="card-body py-2 d-flex flex-wrap align-items-center justify-content-between gap-2">
         <span class="fw-bold text-secondary me-2"><i class="bi bi-lightning-charge-fill text-warning"></i> Quick Actions:</span>
         <div class="d-flex flex-wrap gap-2">
-            {% if role == 'System Administrator' %}
-                <a href="{{ url_for('admin.users_list') }}" class="btn btn-sm btn-outline-primary"><img class="staff-icon" src="{{ url_for('static', filename='images/staff-icon.png') }}" alt=""> Staff Users</a>
-                <a href="{{ url_for('admin.user_new') }}" class="btn btn-sm btn-outline-success"><i class="bi bi-person-plus-fill"></i> Add User</a>
+            {% if role in ['System Administrator', 'Admin'] %}
                 <a href="{{ url_for('edit_requests.list_requests') }}" class="btn btn-sm btn-outline-danger position-relative">
                     <i class="bi bi-inbox-fill"></i> Edit Requests
                     {% set pc = pending_edit_count() if pending_edit_count is defined else 0 %}
@@ -517,7 +515,7 @@
         </div>
     </div>
 </div>
-{% if role not in ['System Administrator','Warden','Records Officer','Receptionist','Security Officer'] %}
+{% if role not in ['System Administrator','Admin','Warden','Records Officer','Receptionist','Security Officer'] %}
 <div class="alert alert-warning shadow-sm">
     Your role (<strong>{{ role }}</strong>) has no custom quick actions configured yet.
 </div>

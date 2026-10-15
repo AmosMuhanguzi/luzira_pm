@@ -82,12 +82,13 @@
                 </li>
 
                 {# ----- System Administrator only ----- #}
-                {% if current_user.role_name == 'System Administrator' %}
+                {% if current_user.role_name in ['System Administrator', 'Admin'] %}
                 <li class="nav-item">
                     <a class="nav-link" href="{{ url_for('reports.index') }}">
                         <i class="bi bi-file-earmark-bar-graph"></i> Reports
                     </a>
                 </li>
+                {% if has_permission(Permissions.USER_VIEW) %}
                 <li class="nav-item">
                     <a class="nav-link" href="{{ url_for('admin.users_list') }}">
                         <img class="staff-icon staff-icon--nav"
@@ -95,6 +96,7 @@
                              alt=""> Staff Users
                     </a>
                 </li>
+                {% endif %}
                 <li class="nav-item">
                     <a class="nav-link" href="{{ url_for('admin.cells') }}">
                         <img class="cell-block-icon cell-block-icon--nav"
@@ -124,7 +126,7 @@
 
                 {# ----- Inmate records ----- #}
                 {% if current_user.role_name in
-                      ['System Administrator', 'Warden', 'Records Officer', 'Receptionist', 'Medical Officer', 'Security Officer'] %}
+                      ['System Administrator', 'Admin', 'Warden', 'Records Officer', 'Receptionist', 'Medical Officer', 'Security Officer'] %}
                 <li class="nav-item">
                     <a class="nav-link" href="{{ url_for('inmate.list_inmates') }}">
                         <img class="inmate-icon inmate-icon--nav"
@@ -143,7 +145,7 @@
                 {% endif %}
                 {% endif %}
                 {% if current_user.role_name in
-                      ['System Administrator', 'Warden', 'Records Officer', 'Receptionist', 'Security Officer'] %}
+                      ['System Administrator', 'Admin', 'Warden', 'Records Officer', 'Receptionist', 'Security Officer'] %}
                 <li class="nav-item">
                     <a class="nav-link" href="{{ url_for('visitor.list_visitors') }}">
                         <img class="visitor-icon visitor-icon--nav"
@@ -162,7 +164,7 @@
                 {% endif %}
 
                 {# ----- Non-admins see "My Requests" ----- #}
-                {% if current_user.role_name not in ['System Administrator', 'Medical Officer'] %}
+                {% if current_user.role_name not in ['System Administrator', 'Admin', 'Medical Officer'] %}
                 <li class="nav-item">
                     <a class="nav-link" href="{{ url_for('edit_requests.my_requests') }}">
                         <i class="bi bi-send-check"></i> My Requests
