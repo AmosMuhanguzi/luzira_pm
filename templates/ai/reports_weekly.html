@@ -1,77 +1,292 @@
 {% extends "base.html" %}
-{% block title %}Weekly Report — Luzira PMS{% endblock %}
+{% block title %}AI Intelligence Report — Luzira PMS{% endblock %}
+{% block page_styles %}
+<link href="{{ url_for('static', filename='css/reports.css') }}" rel="stylesheet">
+<style>
+    .ai-report-chart {
+        position: relative;
+        min-height: 250px;
+    }
+    .ai-report-chart canvas {
+        max-height: 280px;
+    }
+    .ai-report-table th,
+    .ai-report-table td {
+        vertical-align: middle;
+    }
+    .ai-report-note {
+        border-left: 4px solid #800000;
+        background: #fff8e5;
+    }
+    @media print {
+        .ai-report-chart {
+            break-inside: avoid;
+        }
+    }
+</style>
+{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-3 d-print-none">
-    <h2 class="mb-0"><i class="bi bi-file-earmark-text"></i> Weekly Report</h2>
-    <div>
-        <button class="btn btn-primary" onclick="window.print()">
-            <i class="bi bi-printer"></i> Print / Save as PDF
-        </button>
-        <a href="{{ url_for('ai.dashboard') }}" class="btn btn-outline-secondary">
-            <i class="bi bi-arrow-left"></i> Back
-        </a>
-    </div>
-</div>
+<section class="reports-page">
+    <header class="reports-heading d-print-none">
+        <div>
+            <p class="reports-eyebrow mb-1">Luzira Prison Management System</p>
+            <h1 class="h2 mb-1">AI Intelligence Report</h1>
+            <p class="text-muted mb-0">AI-assisted operational, risk and anomaly review</p>
+        </div>
+        <div class="reports-actions">
+            <button type="button" class="btn btn-primary" onclick="window.print()">
+                <i class="bi bi-printer"></i> Print / Save as PDF
+            </button>
+            <a class="btn btn-outline-secondary" href="{{ url_for('ai.dashboard') }}">
+                <i class="bi bi-arrow-left"></i> Back
+            </a>
+        </div>
+    </header>
 
-<div class="card shadow-sm border-0">
-    <div class="card-body">
-        <div class="text-center mb-4">
-            <h3>Luzira Prison Management System</h3>
-            <p class="text-muted mb-0">
-                Weekly Summary: {{ week_ago }} → {{ today }}
-            </p>
-            <p class="text-muted small">
-                Generated {{ today }} · Universal Technology and Management University
+    <form class="report-filter card border-0 shadow-sm d-print-none" method="get">
+        <div class="row g-3 align-items-end">
+            <div class="col-sm-5">
+                <label class="form-label" for="from-date">From</label>
+                <input class="form-control" id="from-date" type="date" name="from_date"
+                       value="{{ report_start.isoformat() }}" required>
+            </div>
+            <div class="col-sm-5">
+                <label class="form-label" for="to-date">To</label>
+                <input class="form-control" id="to-date" type="date" name="to_date"
+                       value="{{ report_end.isoformat() }}" required>
+            </div>
+            <div class="col-sm-2 d-grid">
+                <button class="btn btn-primary" type="submit">Run report</button>
+            </div>
+        </div>
+        <p class="form-text mb-0 mt-2">
+            The default period is the current Monday–Sunday week. Select any date
+            range, including dates that span months or years.
+        </p>
+    </form>
+
+    <article class="report-sheet">
+        <div class="report-letterhead">
+            <img src="{{ url_for('static', filename='images/luzira-prison-logo.png') }}"
+                 alt="Luzira Prison logo">
+            <div>
+                <h2>Luzira Prison</h2>
+                <p class="mb-0">P.O. Box 12345, Kampala</p>
+                <p class="mb-0">Luzira Prison Management System</p>
+            </div>
+            <span class="report-period-badge">AI Report</span>
+        </div>
+
+        <div class="report-title-band">
+            <h3>AI Intelligence Report</h3>
+            <p class="mb-0">
+                {{ report_start.strftime('%d %B %Y') }} – {{ report_end.strftime('%d %B %Y') }}
+                · Generated {{ today.strftime('%d %B %Y') }}
             </p>
         </div>
 
-        <table class="table table-bordered">
-            <tbody>
-                <tr>
-                    <th style="width: 60%">New inmates admitted</th>
-                    <td class="text-end"><strong>{{ new_inmates }}</strong></td>
-                </tr>
-                <tr>
-                    <th>New visitors registered</th>
-                    <td class="text-end"><strong>{{ new_visitors }}</strong></td>
-                </tr>
-                <tr>
-                    <th>Total visits logged</th>
-                    <td class="text-end"><strong>{{ week_visits }}</strong></td>
-                </tr>
-                <tr>
-                    <th>Visitors flagged by AI</th>
-                    <td class="text-end"><strong>{{ flagged }}</strong></td>
-                </tr>
-            </tbody>
-        </table>
-
-        <h5 class="mt-4">Inmate risk distribution</h5>
-        <table class="table table-bordered">
-            <thead>
-                <tr><th>Risk level</th><th class="text-end">Count</th></tr>
-            </thead>
-            <tbody>
-                {% for level, count in risk_counts.items() %}
-                <tr>
-                    <td>{{ level }}</td>
-                    <td class="text-end">{{ count }}</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-
-        <div class="text-muted small mt-4">
-            This report is generated from live system data. Use
-            <strong>Print → Save as PDF</strong> to archive.
+        <div class="report-metrics">
+            {% for metric in metrics %}
+            <div class="metric-card">
+                <span>{{ metric.label }}</span>
+                <strong>{{ metric.value }}</strong>
+            </div>
+            {% endfor %}
         </div>
-    </div>
-</div>
 
+        <div class="alert ai-report-note mt-4 mb-0 small">
+            <strong>Interpretation:</strong>
+            AI findings are screening indicators for review, not proof of misconduct
+            or standalone decisions. Officers should verify alerts against case records
+            and document any action taken.
+        </div>
+
+        <section class="report-section">
+            <h4>AI risk and alert distribution</h4>
+            <div class="row g-4">
+                <div class="col-md-6 ai-report-chart">
+                    <h5 class="text-center small text-muted">Active inmate risk</h5>
+                    <canvas id="inmateRiskChart"
+                            aria-label="Active inmate risk distribution"></canvas>
+                </div>
+                <div class="col-md-6 ai-report-chart">
+                    <h5 class="text-center small text-muted">AI alert severity</h5>
+                    <canvas id="alertSeverityChart"
+                            aria-label="Weekly AI alert severity distribution"></canvas>
+                </div>
+            </div>
+        </section>
+
+        <section class="report-section">
+            <h4>Visitor and visit intelligence</h4>
+            <div class="row g-4">
+                <div class="col-md-6 ai-report-chart">
+                    <h5 class="text-center small text-muted">Visitor risk profile</h5>
+                    <canvas id="visitorRiskChart"
+                            aria-label="Visitor risk profile distribution"></canvas>
+                </div>
+                <div class="col-md-6 ai-report-chart">
+                    <h5 class="text-center small text-muted">Visit types in selected period</h5>
+                    <canvas id="visitTypeChart"
+                            aria-label="Visit type distribution"></canvas>
+                </div>
+            </div>
+        </section>
+
+        <section class="report-section">
+            <h4>Daily activity in selected period</h4>
+            <div class="ai-report-chart">
+                <canvas id="dailyVisitsChart"
+                        aria-label="Daily visitor check-in activity"></canvas>
+            </div>
+        </section>
+
+        <section class="report-section">
+            <h4>AI review and operational details</h4>
+            <div class="table-responsive">
+                <table class="table table-sm table-bordered report-table ai-report-table">
+                    <tbody>
+                        <tr>
+                            <th scope="row">Visits flagged by AI this week</th>
+                            <td class="text-end">{{ flagged_visits }}</td>
+                        </tr>
+                        <tr>
+                            <th scope="row">Alerts reviewed</th>
+                            <td class="text-end">{{ reviewed_alerts }}</td>
+                        </tr>
+                        <tr>
+                            <th scope="row">Alerts awaiting review</th>
+                            <td class="text-end">{{ unreviewed_alerts }}</td>
+                        </tr>
+                        <tr>
+                            <th scope="row">Current active population</th>
+                            <td class="text-end">{{ active_population }}</td>
+                        </tr>
+                        <tr>
+                            <th scope="row">Latest population forecast</th>
+                            <td class="text-end">
+                                {% if latest_forecast %}
+                                {{ latest_forecast.predicted_population }}
+                                {% if latest_forecast.capacity_utilization is not none %}
+                                ({{ latest_forecast.capacity_utilization }}% capacity)
+                                {% endif %}
+                                {% else %}
+                                No forecast available
+                                {% endif %}
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <section class="report-section">
+            <h4>Alert categories recorded in selected period</h4>
+            {% if alert_type_counts %}
+            <div class="table-responsive">
+                <table class="table table-sm report-table">
+                    <thead>
+                        <tr><th>Analysis category</th><th class="text-end">Alerts</th></tr>
+                    </thead>
+                    <tbody>
+                    {% for category, count in alert_type_counts.items() %}
+                        <tr><td>{{ category }}</td><td class="text-end">{{ count }}</td></tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <p class="report-empty mb-0">No AI alerts were generated during this period.</p>
+            {% endif %}
+        </section>
+
+        <p class="report-data-note">
+            This report is generated from live system data for the selected seven-day
+            period. All high and critical findings should be reviewed by an authorised
+            officer and linked to the corresponding operational record.
+        </p>
+        <div class="report-signoff">
+            <span>Prepared by: Luzira Prison Management System</span>
+            <span>AI intelligence review</span>
+        </div>
+    </article>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+(function () {
+    const colors = {
+        maroon: '#800000',
+        low: '#198754',
+        medium: '#0dcaf0',
+        high: '#fd7e14',
+        critical: '#dc3545',
+        muted: '#adb5bd'
+    };
+
+    function values(data) {
+        return Object.values(data);
+    }
+
+    function donut(id, labels, data, backgroundColor) {
+        new Chart(document.getElementById(id), {
+            type: 'doughnut',
+            data: { labels: labels, datasets: [{ data: data, backgroundColor: backgroundColor, borderWidth: 2, borderColor: '#fff' }] },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'bottom', labels: { boxWidth: 12, padding: 12 } }
+                },
+                cutout: '58%'
+            }
+        });
+    }
+
+    const inmateRisk = {{ risk_counts|tojson }};
+    donut('inmateRiskChart', Object.keys(inmateRisk), values(inmateRisk),
+        [colors.low, colors.medium, colors.high, colors.critical]);
+
+    const alertSeverity = {{ alert_severity_counts|tojson }};
+    donut('alertSeverityChart', Object.keys(alertSeverity), values(alertSeverity),
+        [colors.critical, colors.high, colors.medium, colors.low, colors.muted]);
+
+    const visitorRisk = {{ visitor_risk_counts|tojson }};
+    donut('visitorRiskChart', Object.keys(visitorRisk), values(visitorRisk),
+        [colors.low, colors.medium, colors.high, colors.critical]);
+
+    const visitTypes = {{ visit_type_counts|tojson }};
+    donut('visitTypeChart', Object.keys(visitTypes), values(visitTypes),
+        ['#800000', '#0d6efd', '#6f42c1', '#20c997', '#6c757d', '#ffc107']);
+
+    new Chart(document.getElementById('dailyVisitsChart'), {
+        type: 'bar',
+        data: {
+            labels: {{ daily_labels|tojson }},
+            datasets: [{
+                label: 'Visitor check-ins',
+                data: {{ daily_visits|tojson }},
+                backgroundColor: '#800000',
+                borderRadius: 5
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: { y: { beginAtZero: true, ticks: { precision: 0 } } },
+            plugins: { legend: { display: false } }
+        }
+    });
+})();
+</script>
 <style media="print">
     .d-print-none, nav, footer { display: none !important; }
     body { background: white !important; }
-    .card { box-shadow: none !important; border: 1px solid #ccc !important; }
+    .report-sheet { box-shadow: none !important; border: 1px solid #ccc !important; }
+    .ai-report-chart { min-height: 230px; }
+    .report-section { break-inside: avoid; }
 </style>
 {% endblock %}

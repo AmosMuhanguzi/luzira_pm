@@ -198,27 +198,126 @@ def run_inmate_risk():
 @login_required
 @require_permission(Permissions.AI_VIEW_DASHBOARD)
 def weekly_report():
+    from collections import Counter
+    from datetime import date, timedelta
+    from models.ai import PopulationForecast
     from models.inmate import Inmate
     from models.visitor import Visitor, VisitLog
-    from datetime import date, timedelta
 
-    week_ago = date.today() - timedelta(days=7)
+    today = date.today()
+    default_start = today - timedelta(days=today.weekday())
+    default_end = default_start + timedelta(days=6)
+    from_date = request.args.get('from_date')
+    to_date = request.args.get('to_date')
 
-    new_inmates = Inmate.query.filter(Inmate.created_at >= week_ago).count()
-    new_visitors = Visitor.query.filter(Visitor.created_at >= week_ago).count()
-    week_visits  = VisitLog.query.filter(
-        VisitLog.check_in_time >= datetime.combine(week_ago, datetime.min.time())
-    ).count()
-    flagged      = Visitor.query.filter_by(anomaly_flag=True).count()
-    risk_counts  = {'Low': 0, 'Medium': 0, 'High': 0, 'Critical': 0}
-    rows = (db.session.query(Inmate.risk_level, db.func.count(Inmate.inmate_id))
-            .filter(Inmate.status == 'Active').group_by(Inmate.risk_level).all())
-    for lvl, cnt in rows:
-        if lvl in risk_counts:
-            risk_counts[lvl] = cnt
+    try:
+        report_start = date.fromisoformat(from_date) if from_date else default_start
+        report_end = date.fromisoformat(to_date) if to_date else default_end
+        if report_end < report_start:
+            raise ValueError
+    except ValueError:
+        flash('Choose a valid report date range where the end date is not before the start date.', 'danger')
+        return redirect(url_for('ai.weekly_report'))
 
-    return render_template('ai/reports_weekly.html',
-                           week_ago=week_ago, today=date.today(),
-                           new_inmates=new_inmates, new_visitors=new_visitors,
-                           week_visits=week_visits, flagged=flagged,
-                           risk_counts=risk_counts)
+    period_start = datetime.combine(report_start, datetime.min.time())
+    period_end = datetime.combine(
+        report_end + timedelta(days=1),
+        datetime.min.time(),
+    )
+
+    inmates = Inmate.query.filter(
+        Inmate.created_at >= period_start,
+        Inmate.created_at < period_end,
+    ).all()
+    visitors = Visitor.query.filter(
+        Visitor.created_at >= period_start,
+        Visitor.created_at < period_end,
+    ).all()
+    visits = VisitLog.query.filter(
+        VisitLog.check_in_time >= period_start,
+        VisitLog.check_in_time < period_end,
+    ).all()
+    alerts = AIAnalysisLog.query.filter(
+        AIAnalysisLog.analysis_timestamp >= period_start,
+        AIAnalysisLog.analysis_timestamp < period_end,
+    ).all()
+
+    risk_levels = ('Low', 'Medium', 'High', 'Critical')
+    risk_counts = {
+        level: Inmate.query.filter(
+            Inmate.status == 'Active',
+            Inmate.risk_level == level,
+        ).count()
+        for level in risk_levels
+    }
+    visitor_risk_counts = {
+        level: Visitor.query.filter(Visitor.risk_rating == level).count()
+        for level in risk_levels
+    }
+
+    visit_type_counts = Counter(
+        (visit.visit_type or 'Unspecified') for visit in visits
+    )
+    alert_severity_counts = Counter(
+        (alert.severity or 'Info') for alert in alerts
+    )
+    alert_type_counts = Counter(
+        (alert.analysis_type or 'Other') for alert in alerts
+    )
+    daily_visits = [
+        sum(1 for visit in visits if visit.check_in_time.date() == day)
+        for day in (
+            report_start + timedelta(days=i)
+            for i in range((report_end - report_start).days + 1)
+        )
+    ]
+    flagged_visits = sum(1 for visit in visits if visit.anomaly_flag)
+    reviewed_alerts = sum(1 for alert in alerts if alert.is_reviewed)
+    high_risk_alerts = sum(
+        1 for alert in alerts if alert.severity in ('High', 'Critical')
+    )
+    active_population = Inmate.query.filter_by(status='Active').count()
+    latest_forecast = (
+        PopulationForecast.query
+        .order_by(PopulationForecast.forecast_id.desc())
+        .first()
+    )
+
+    metrics = [
+        {'label': 'New inmates admitted', 'value': len(inmates)},
+        {'label': 'New visitors registered', 'value': len(visitors)},
+        {'label': 'Visits logged', 'value': len(visits)},
+        {'label': 'AI alerts generated', 'value': len(alerts)},
+        {'label': 'High/Critical alerts', 'value': high_risk_alerts},
+        {'label': 'Active population', 'value': active_population},
+    ]
+
+    return render_template(
+        'ai/reports_weekly.html',
+        report_start=report_start,
+        report_end=report_end,
+        today=today,
+        metrics=metrics,
+        risk_counts=risk_counts,
+        visitor_risk_counts=visitor_risk_counts,
+        visit_type_counts=dict(
+            sorted(visit_type_counts.items(), key=lambda item: (-item[1], item[0]))
+        ),
+        alert_severity_counts={
+            severity: alert_severity_counts.get(severity, 0)
+            for severity in ('Critical', 'High', 'Medium', 'Low', 'Info')
+        },
+        alert_type_counts=dict(
+            sorted(alert_type_counts.items(), key=lambda item: (-item[1], item[0]))
+        ),
+        daily_labels=[
+            (report_start + timedelta(days=i)).strftime('%d %b')
+            for i in range((report_end - report_start).days + 1)
+        ],
+        daily_visits=daily_visits,
+        flagged_visits=flagged_visits,
+        reviewed_alerts=reviewed_alerts,
+        unreviewed_alerts=len(alerts) - reviewed_alerts,
+        active_population=active_population,
+        latest_forecast=latest_forecast,
+    )
