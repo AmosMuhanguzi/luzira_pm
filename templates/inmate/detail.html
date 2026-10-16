@@ -96,7 +96,7 @@
                 <dl class="row mb-0">
                     <dt class="col-sm-4">Crime</dt><dd class="col-sm-8">{{ inmate.crime_category or '—' }}</dd>
                     <dt class="col-sm-4">Description</dt><dd class="col-sm-8">{{ inmate.crime_description or '—' }}</dd>
-                    <dt class="col-sm-4">Court case №</dt><dd class="col-sm-8">{{ inmate.court_case_number or '—' }}</dd>
+                    <dt class="col-sm-4">Court case No</dt><dd class="col-sm-8">{{ inmate.court_case_number or '—' }}</dd>
                     <dt class="col-sm-4">Offence</dt><dd class="col-sm-8">{{ inmate.sentence_type or '—' }}</dd>
                     {% if inmate.sentence_type == 'Remand' %}
                     <dt class="col-sm-4">Next date to court</dt><dd class="col-sm-8">{{ inmate.next_court_date or '—' }}</dd>
